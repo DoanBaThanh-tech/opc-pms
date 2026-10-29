@@ -1,0 +1,62 @@
+import type { Product } from '@/features/products/logic/types'
+import { downloadBlob, downloadHtml, fileSlug } from '@/core/utils/download'
+import { buildDossierHtml } from './dossierHtml'
+import { buildDocumentHtml } from './documentHtml'
+import { docsByGroup } from './documents'
+import type { HtmlContext } from './htmlShared'
+import { getLogoDataUrl } from './logo'
+import type { ProductVersion, VersionDocument } from './types'
+
+export interface DossierArgs {
+  product: Product
+  version: ProductVersion
+  previous?: ProductVersion
+  docs: VersionDocument[]
+  versions: ProductVersion[]
+  names: { dosage: string; category: string }
+}
+
+async function toContext(args: DossierArgs): Promise<HtmlContext> {
+  return { ...args, logoSrc: await getLogoDataUrl() }
+}
+
+const baseName = (p: Product, v: ProductVersion) => `OPC_${fileSlug(p.code)}_v${fileSlug(v.version)}`
+
+/** Tải 1 tài liệu dưới dạng HTML in được (mở file → In/Lưu PDF). */
+export async function downloadSingleDocument(args: DossierArgs, doc: VersionDocument) {
+  const ctx = await toContext(args)
+  downloadHtml(`${baseName(args.product, args.version)}_${fileSlug(doc.name)}.html`, buildDocumentHtml(ctx, doc))
+}
+
+const FOLDER: Record<VersionDocument['group'], string> = {
+  legal: '01-phap-ly',
+  usage: '02-huong-dan-su-dung',
+  packaging: '03-quy-cach-ky-thuat',
+}
+
+/** Tải toàn bộ hồ sơ của phiên bản: HTML tổng quan + từng tài liệu + JSON đầy đủ, đóng gói ZIP. */
+export async function downloadVersionDossier(args: DossierArgs) {
+  const ctx = await toContext(args)
+  const JSZip = (await import('jszip')).default
+  const zip = new JSZip()
+  const root = zip.folder(`OPC_ho-so_${args.product.code}_v${args.version.version}`)!
+
+  root.file('00-tong-quan.html', buildDossierHtml(ctx))
+  root.file('du-lieu-day-du.json', JSON.stringify({
+    exportedAt: new Date().toISOString(),
+    product: args.product,
+    version: args.version,
+    documents: args.docs,
+    allVersions: args.versions,
+  }, null, 2))
+
+  for (const group of ['legal', 'usage', 'packaging'] as const) {
+    const folder = root.folder(FOLDER[group])!
+    docsByGroup(args.docs, group).forEach((doc, i) => {
+      folder.file(`${String(i + 1).padStart(2, '0')}-${fileSlug(doc.name)}.html`, buildDocumentHtml(ctx, doc))
+    })
+  }
+
+  const blob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 6 } })
+  downloadBlob(`${baseName(args.product, args.version)}_ho-so-day-du.zip`, blob)
+}

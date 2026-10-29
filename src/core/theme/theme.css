@@ -1,0 +1,66 @@
+@theme {
+  --font-sans: 'Be Vietnam Pro', system-ui, -apple-system, 'Segoe UI', sans-serif;
+
+  /* Xanh dương bầu trời */
+  --color-brand-50: #f0f9ff;
+  --color-brand-100: #e0f2fe;
+  --color-brand-200: #bae6fd;
+  --color-brand-300: #7dd3fc;
+  --color-brand-400: #38bdf8;
+  --color-brand-500: #0ea5e9;
+  --color-brand-600: #0284c7;
+  --color-brand-700: #0369a1;
+  --color-brand-800: #075985;
+  --color-brand-900: #0c4a6e;
+
+  /* Màu logo OPC dùng làm điểm nhấn / cảnh báo */
+  --color-opc-red: #ed1c24;
+  --color-opc-green: #00753a;
+
+  --color-ink: #0f2942;
+  --color-muted: #5b7186;
+  --color-line: #dbe8f3;
+
+  --shadow-soft: 0 1px 2px rgb(12 74 110 / 0.05), 0 8px 24px -8px rgb(12 74 110 / 0.12);
+  --shadow-pop: 0 20px 50px -12px rgb(12 74 110 / 0.35);
+
+  --animate-float: float 6s ease-in-out infinite;
+  @keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-6px); }
+  }
+  --animate-shimmer: shimmer 1.4s linear infinite;
+  @keyframes shimmer {
+    from { background-position: -200% 0; }
+    to { background-position: 200% 0; }
+  }
+}
+
+@layer base {
+  html { -webkit-tap-highlight-color: transparent; }
+  body {
+    font-family: var(--font-sans);
+    color: var(--color-ink);
+    background:
+      radial-gradient(1200px 500px at 85% -10%, rgb(125 211 252 / 0.35), transparent 60%),
+      radial-gradient(900px 500px at -10% 10%, rgb(186 230 253 / 0.45), transparent 60%),
+      #f6fbff;
+    background-attachment: fixed;
+    min-height: 100dvh;
+  }
+  ::selection { background: var(--color-brand-200); }
+  :focus-visible { outline: 2px solid var(--color-brand-500); outline-offset: 2px; }
+}
+
+@layer utilities {
+  /* Họa tiết lục giác lấy cảm hứng từ logo OPC */
+  .hex-pattern {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='56' height='97'%3E%3Cpath d='M28 2l26 15v30L28 62 2 47V17z M28 64l26 15v18M28 64L2 79v18' fill='none' stroke='white' stroke-opacity='.18' stroke-width='1.5'/%3E%3C/svg%3E");
+  }
+  .skeleton {
+    background: linear-gradient(90deg, #e6f2fb 25%, #f3f9fe 50%, #e6f2fb 75%);
+    background-size: 200% 100%;
+    animation: var(--animate-shimmer);
+  }
+  .scrollbar-thin { scrollbar-width: thin; scrollbar-color: var(--color-brand-200) transparent; }
+}
