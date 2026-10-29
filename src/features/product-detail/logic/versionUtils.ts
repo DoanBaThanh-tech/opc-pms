@@ -54,6 +54,17 @@ export function suggestNextVersion(current: string) {
   return parts.join('.')
 }
 
+/** Ngày hôm nay dạng YYYY-MM-DD theo giờ địa phương. */
+export function todayIso() {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+/** Phiên bản chỉ được đưa vào sử dụng từ ngày hiệu lực. */
+export function isVersionDue(version: ProductVersion, onDate = todayIso()) {
+  return version.effectiveDate.slice(0, 10) <= onDate
+}
+
 /** Số kế tiếp dựa trên phiên bản cao nhất đã có (kể cả Coming soon). */
 export function suggestNextVersionAfter(versions: ProductVersion[]) {
   const latest = latestVersionOf(versions)

@@ -1,6 +1,7 @@
 /** Toàn bộ đường dẫn API tập trung 1 chỗ, đổi BE chỉ sửa ở đây. */
 export const endpoints = {
   products: '/products',
+  pendingVersions: '/product-versions/pending-approval',
   dosageForms: '/dosage-forms',
   categories: '/categories',
   approvals: '/approvals',

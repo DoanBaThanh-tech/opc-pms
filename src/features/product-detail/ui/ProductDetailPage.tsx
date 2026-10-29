@@ -1,18 +1,19 @@
 import { useMemo, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, PackageSearch } from 'lucide-react'
 import { Button } from '@/core/components/Button'
 import { ConfirmDialog } from '@/core/components/ConfirmDialog'
 import { useToast } from '@/core/components/Toast'
 import type { ApiError } from '@/core/types/common'
+import { formatDate } from '@/core/utils/format'
 import { useProducts } from '@/features/products/logic/useProducts'
 import { useLookups } from '@/features/products/logic/useLookups'
 import { downloadSingleDocument, downloadVersionDossier } from '../logic/downloadDossier'
 import { buildDocuments, docsByGroup } from '../logic/documents'
-import type { CreateVersionInput, ProductVersion, VersionDocument } from '../logic/types'
+import { buildNewVersionInput } from '../logic/newVersionDefaults'
+import type { ProductVersion, VersionDocument } from '../logic/types'
 import { useActivateVersion, useCreateVersion, useProductVersions } from '../logic/useProductVersions'
-import { getCurrentVersion, previousVersionOf, sortVersions, suggestNextVersionAfter } from '../logic/versionUtils'
-import { CreateVersionModal } from './CreateVersionModal'
+import { getCurrentVersion, isVersionDue, previousVersionOf, sortVersions, suggestNextVersionAfter } from '../logic/versionUtils'
 import { DetailHero } from './DetailHero'
 import { DocumentViewerModal } from './DocumentViewerModal'
 import { GeneralInfoCard } from './GeneralInfoCard'
@@ -27,6 +28,7 @@ export default function ProductDetailPage() {
   const { id } = useParams()
   const productId = Number(id)
   const toast = useToast()
+  const navigate = useNavigate()
 
   const { data: products = [], isLoading: loadingProducts } = useProducts()
   const { data: versions = [], isLoading: loadingVersions } = useProductVersions(Number.isFinite(productId) ? productId : 0)
@@ -36,7 +38,6 @@ export default function ProductDetailPage() {
 
   const [selectedId, setSelectedId] = useState<number | null>(null)
   const [previewId, setPreviewId] = useState<number | null>(null)
-  const [createOpen, setCreateOpen] = useState(false)
   const [pendingActivate, setPendingActivate] = useState<ProductVersion | null>(null)
   const [viewerDoc, setViewerDoc] = useState<VersionDocument | null>(null)
   const [downloading, setDownloading] = useState(false)
@@ -88,19 +89,23 @@ export default function ProductDetailPage() {
     }
   }
 
-  const handleCreate = (input: CreateVersionInput) => {
-    createVersion.mutate(input, {
+  const handleCreateVersion = () => {
+    const base = current ?? selected
+    if (!base) return
+    createVersion.mutate(buildNewVersionInput(base, suggestNextVersionAfter(sorted)), {
       onSuccess: (created) => {
-        toast.success(`Đã tạo phiên bản ${created.version} ở trạng thái Coming soon`)
-        setCreateOpen(false)
-        setSelectedId(created.id)
-        setPreviewId(created.id)
+        toast.success(`Đã tạo phiên bản ${created.version} · Chờ duyệt`)
+        navigate(`/products/${productId}/versions/${created.id}`)
       },
       onError: showError,
     })
   }
 
   const requestActivate = (version: ProductVersion) => {
+    if (!isVersionDue(version)) {
+      toast.info(`Chưa tới ngày áp dụng (${formatDate(version.effectiveDate)}). Chưa thể đưa phiên bản vào sử dụng.`)
+      return
+    }
     setPreviewId(null)
     setPendingActivate(version)
   }
@@ -143,8 +148,9 @@ export default function ProductDetailPage() {
         categoryName={categoryName}
         docsCount={docs.length}
         downloading={downloading}
+        creating={createVersion.isPending}
         onSelect={setSelectedId}
-        onCreate={() => setCreateOpen(true)}
+        onCreate={handleCreateVersion}
         onDownload={() => handleDownloadVersion(selected, docs, previous)}
       />
 
@@ -166,25 +172,17 @@ export default function ProductDetailPage() {
             versions={sorted}
             selectedId={selected.id}
             onPreview={(v) => setPreviewId(v.id)}
-            onCreate={() => setCreateOpen(true)}
+            onCreate={handleCreateVersion}
+            creating={createVersion.isPending}
           />
         </aside>
 
         <div className="space-y-5 xl:col-start-1 xl:row-start-2">
           <LegalFrame version={selected} docs={docsByGroup(docs, 'legal')} onView={setViewerDoc} onDownload={handleDownloadDoc} />
-          <UsageFrame version={selected} previous={previous} docs={docsByGroup(docs, 'usage')} onView={setViewerDoc} onDownload={handleDownloadDoc} />
-          <PackagingFrame product={product} version={selected} docs={docsByGroup(docs, 'packaging')} onView={setViewerDoc} onDownload={handleDownloadDoc} />
+          <UsageFrame version={selected} previous={previous} docs={docsByGroup(docs, 'usage').filter((d) => !d.shared)} onView={setViewerDoc} onDownload={handleDownloadDoc} />
+          <PackagingFrame product={product} version={selected} onView={setViewerDoc} onDownload={handleDownloadDoc} />
         </div>
       </div>
-
-      <CreateVersionModal
-        open={createOpen}
-        base={current ?? selected}
-        suggestedVersion={suggestNextVersionAfter(sorted)}
-        loading={createVersion.isPending}
-        onClose={() => setCreateOpen(false)}
-        onSubmit={handleCreate}
-      />
 
       <VersionPreviewDrawer
         open={!!previewVersion}
@@ -209,9 +207,10 @@ export default function ProductDetailPage() {
 
       <ConfirmDialog
         open={!!pendingActivate}
-        title="Đưa phiên bản vào sử dụng?"
-        message={`Phiên bản ${pendingActivate?.version ?? ''} sẽ trở thành phiên bản hiện hành. Phiên bản đang áp dụng sẽ tự động chuyển sang trạng thái lưu trữ và không thể áp dụng lại.`}
-        confirmText="Đưa vào sử dụng"
+        title="Cập nhật phiên bản mới"
+        message={`Bạn có chắc chắn muốn cập nhật phiên bản mới không? Phiên bản ${pendingActivate?.version ?? ''} sẽ trở thành phiên bản hiện hành, phiên bản đang áp dụng tự động chuyển sang lưu trữ.`}
+        confirmText="Cập nhật"
+        confirmVariant="primary"
         loading={activateVersion.isPending}
         onConfirm={confirmActivate}
         onClose={() => setPendingActivate(null)}

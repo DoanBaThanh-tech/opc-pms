@@ -1,5 +1,6 @@
-import { CalendarCheck2, Stamp } from 'lucide-react'
+import { CalendarCheck2, Plus, Stamp } from 'lucide-react'
 import { Badge } from '@/core/components/Badge'
+import { Button } from '@/core/components/Button'
 import { formatDate } from '@/core/utils/format'
 import { STAGE_META, type ProductVersion, type VersionDocument } from '../../logic/types'
 import { Frame } from './Frame'
@@ -8,11 +9,13 @@ import { DocumentList } from './DocumentList'
 interface Props {
   version: ProductVersion
   docs: VersionDocument[]
+  stageLabel?: string
   onView: (doc: VersionDocument) => void
   onDownload: (doc: VersionDocument) => void
+  onAdd?: () => void
 }
 
-export function LegalFrame({ version, docs, onView, onDownload }: Props) {
+export function LegalFrame({ version, docs, stageLabel, onView, onDownload, onAdd }: Props) {
   const stage = STAGE_META[version.stage]
   const draft = version.stage === 'coming_soon'
   return (
@@ -21,6 +24,11 @@ export function LegalFrame({ version, docs, onView, onDownload }: Props) {
       title="Hồ sơ pháp lý & quyết định phê duyệt"
       subtitle="Quyết định thay đổi phiên bản, giấy đăng ký và biên bản thẩm định."
       count={docs.length}
+      actions={onAdd ? (
+        <Button size="sm" icon={<Plus className="size-4" />} onClick={onAdd}>
+          Thêm hồ sơ pháp lý/quyết định phê duyệt
+        </Button>
+      ) : undefined}
     >
       <div className="relative mb-3 overflow-hidden rounded-2xl border border-brand-100 bg-linear-to-br from-brand-50 via-white to-brand-50/30 p-4">
         <Stamp className="pointer-events-none absolute -bottom-7 -right-4 size-32 rotate-12 text-brand-100/80" strokeWidth={1} aria-hidden />
@@ -38,7 +46,7 @@ export function LegalFrame({ version, docs, onView, onDownload }: Props) {
               <p className="mt-1 text-[11px] text-muted">Hiệu lực từ {formatDate(version.effectiveDate)}</p>
             </div>
           </div>
-          <Badge tone={stage.tone}>{stage.label}</Badge>
+          <Badge tone={stage.tone}>{stageLabel ?? stage.label}</Badge>
         </div>
       </div>
       <DocumentList docs={docs} onView={onView} onDownload={onDownload} />

@@ -35,6 +35,7 @@ const GROUPS = [
   { key: 'legal' as const, icon: ShieldCheck },
   { key: 'usage' as const, icon: BookOpenCheck },
   { key: 'packaging' as const, icon: Boxes },
+  { key: 'professional' as const, icon: FileText },
 ]
 
 export function VersionPreviewDrawer({ open, version, previous, docs, onClose, onDownload, downloading, onActivate }: Props) {
@@ -122,9 +123,10 @@ export function VersionPreviewDrawer({ open, version, previous, docs, onClose, o
 
           <section>
             <h3 className="mb-2 text-sm font-extrabold text-brand-900">Hồ sơ kèm theo</h3>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 gap-2">
               {GROUPS.map(({ key, icon: GroupIcon }) => {
-                const count = docsByGroup(docs, key).length
+                const groupDocs = docsByGroup(docs, key)
+                const count = key === 'usage' ? groupDocs.filter((d) => !d.shared).length : groupDocs.length
                 return (
                   <div key={key} className="rounded-xl border border-line bg-white px-2 py-3 text-center">
                     <GroupIcon className="mx-auto size-4 text-brand-500" />

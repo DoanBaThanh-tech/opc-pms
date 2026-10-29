@@ -4,6 +4,7 @@ import { Select } from '@/core/components/Select'
 import { cn } from '@/core/utils/format'
 import { useLookups } from '@/features/products/logic/useLookups'
 import { useProducts } from '@/features/products/logic/useProducts'
+import { ProductSearchBar } from '@/features/products/ui/ProductSearchBar'
 import { useComparison } from '../logic/useComparison'
 
 export default function ComparisonPage() {
@@ -16,6 +17,14 @@ export default function ComparisonPage() {
   return (
     <>
       <PageHeader title="So sánh sản phẩm" description="Chọn 2–3 sản phẩm hoặc phiên bản để đặt cạnh nhau" />
+      <ProductSearchBar
+        className="mb-4"
+        placeholder="Tìm thuốc để thêm vào so sánh..."
+        onSelect={(p) => {
+          const empty = c.ids.findIndex((slot) => !slot)
+          c.setSlot(empty >= 0 ? empty : 0, String(p.id))
+        }}
+      />
       <div className="mb-5 grid gap-3 rounded-2xl border border-line bg-white p-4 shadow-soft md:grid-cols-3">
         {c.ids.map((id, i) => (
           <Select key={i} label={`Sản phẩm ${i + 1}${i === 2 ? ' (tùy chọn)' : ''}`} placeholder="— Chọn sản phẩm —" options={options} value={id} onChange={(e) => c.setSlot(i, e.target.value)} />

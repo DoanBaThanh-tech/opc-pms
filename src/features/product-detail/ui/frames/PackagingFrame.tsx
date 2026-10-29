@@ -15,20 +15,18 @@ import { resolvePackagingSpecs } from '../../logic/packagingSpecs'
 import { DOC_STATUS_META, type PackagingPhoto, type PackagingSpec, type ProductVersion, type VersionDocument } from '../../logic/types'
 import { useSavePackagingSpecs } from '../../logic/useProductVersions'
 import { AddPackagingSpecModal } from '../AddPackagingSpecModal'
-import { DocumentList } from './DocumentList'
 import { Frame } from './Frame'
 
 interface Props {
   product: Product
   version: ProductVersion
-  docs: VersionDocument[]
   onView: (doc: VersionDocument) => void
   onDownload: (doc: VersionDocument) => void
 }
 
 const nowIso = () => new Date().toISOString()
 
-export function PackagingFrame({ product, version, docs, onView, onDownload }: Props) {
+export function PackagingFrame({ product, version, onView, onDownload }: Props) {
   const toast = useToast()
   const save = useSavePackagingSpecs(product.id)
   const specs = resolvePackagingSpecs(product, version)
@@ -38,9 +36,6 @@ export function PackagingFrame({ product, version, docs, onView, onDownload }: P
   const [uploadingId, setUploadingId] = useState<string | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
   const pendingSpec = useRef<string | null>(null)
-
-  const specDocIds = new Set(specs.map((s) => s.technicalDoc.id))
-  const sharedDocs = docs.filter((d) => !specDocIds.has(d.id))
 
   const commit = (
     next: PackagingSpec[],
@@ -110,18 +105,6 @@ export function PackagingFrame({ product, version, docs, onView, onDownload }: P
           />
         ))}
       </div>
-
-      {sharedDocs.length > 0 && (
-        <section className="mt-4 rounded-2xl border border-line bg-brand-50/30 p-2 sm:p-3">
-          <div className="mb-1 flex flex-wrap items-center justify-between gap-2 px-1">
-            <h3 className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-muted">
-              <FileText className="size-3.5 text-brand-500" /> Hồ sơ kỹ thuật dùng chung
-            </h3>
-            <Badge tone="gray">{sharedDocs.length} tài liệu</Badge>
-          </div>
-          <DocumentList docs={sharedDocs} onView={onView} onDownload={onDownload} />
-        </section>
-      )}
 
       <input
         ref={fileRef}

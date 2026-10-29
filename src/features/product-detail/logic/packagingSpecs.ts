@@ -64,7 +64,9 @@ export function buildPackagingSpecs(product: Product, version: ProductVersion): 
 }
 
 export function resolvePackagingSpecs(product: Product, version: ProductVersion) {
-  return version.packagingSpecs?.length ? version.packagingSpecs : buildPackagingSpecs(product, version)
+  const specs = version.packagingSpecs?.length ? version.packagingSpecs : buildPackagingSpecs(product, version)
+  const status = STATUS_BY_STAGE[version.stage]
+  return specs.map((spec) => ({ ...spec, technicalDoc: { ...spec.technicalDoc, status } }))
 }
 
 /** Nhân bản quy cách (kèm ảnh) sang phiên bản mới, cập nhật mã hồ sơ kỹ thuật theo phiên bản. */

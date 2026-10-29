@@ -33,9 +33,11 @@ export interface ProductVersion {
   approvedBy: string
   /** Danh sách quy cách đóng gói của phiên bản (nếu chưa có sẽ sinh từ dữ liệu phiên bản). */
   packagingSpecs?: PackagingSpec[]
+  /** Tài liệu người dùng tải lên cho riêng phiên bản này. */
+  extraDocs?: VersionDocument[]
 }
 
-export type DocGroup = 'legal' | 'usage' | 'packaging'
+export type DocGroup = 'legal' | 'usage' | 'packaging' | 'professional'
 export type DocFormat = 'pdf' | 'docx' | 'xlsx'
 export type DocStatus = 'valid' | 'superseded' | 'draft'
 
@@ -50,6 +52,11 @@ export interface VersionDocument {
   updatedAt: string
   status: DocStatus
   note?: string
+  /** HDSD dùng chung – chỉ hiển thị ở khung Hồ sơ chuyên môn & HDSD dùng chung. */
+  shared?: boolean
+  /** Tài liệu do người dùng tải lên (khác với tài liệu sinh tự động). */
+  uploaded?: boolean
+  fileName?: string
 }
 
 /** Ảnh chụp thực tế của quy cách đóng gói (lưu data URL ở FE mock). */
@@ -76,6 +83,32 @@ export interface CreateVersionInput {
   shelfLife: string
   summary: string
   customChanges: VersionChange[]
+}
+
+export interface UpdateVersionInfoInput {
+  version: string
+  effectiveDate: string
+  activeIngredients: string
+  dosageFormId: number
+  categoryId: number
+  packaging: string
+  shelfLife: string
+  regulation: string
+  manufacturer: string
+  manufacturingMethod: string
+  summary: string
+}
+
+export interface DocumentUploadInput {
+  name: string
+  code: string
+  format: DocFormat
+  sizeKb: number
+  pages: number
+  note?: string
+  group: DocGroup
+  shared?: boolean
+  fileName?: string
 }
 
 export const STAGE_ORDER: Record<VersionStage, number> = { coming_soon: 0, current: 1, archived: 2 }
@@ -105,4 +138,5 @@ export const DOC_GROUP_META: Record<DocGroup, { title: string; short: string }> 
   legal: { title: 'Hồ sơ pháp lý & quyết định phê duyệt', short: 'Pháp lý' },
   usage: { title: 'Hồ sơ hướng dẫn sử dụng & so sánh phiên bản', short: 'Hướng dẫn' },
   packaging: { title: 'Quy cách đóng gói & hồ sơ kỹ thuật', short: 'Kỹ thuật' },
+  professional: { title: 'Hồ sơ chuyên môn & HDSD dùng chung', short: 'Chuyên môn' },
 }

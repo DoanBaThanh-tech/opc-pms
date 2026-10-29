@@ -1,6 +1,7 @@
 import type { LucideIcon } from 'lucide-react'
-import { CalendarClock, CalendarCheck2, ClipboardList, Factory, Hash, Layers, Package, Pill, ShieldCheck, Workflow } from 'lucide-react'
+import { CalendarClock, CalendarCheck2, ClipboardList, Factory, Hash, Layers, Package, Pencil, Pill, ShieldCheck, Workflow } from 'lucide-react'
 import { Badge } from '@/core/components/Badge'
+import { Button } from '@/core/components/Button'
 import { formatDate } from '@/core/utils/format'
 import { STAGE_META, type ProductVersion } from '../logic/types'
 
@@ -8,11 +9,13 @@ interface Props {
   version: ProductVersion
   dosageName: string
   categoryName: string
+  stageLabel?: string
+  onEdit?: () => void
 }
 
 interface FieldDef { icon: LucideIcon; label: string; value: string; wide?: boolean }
 
-export function GeneralInfoCard({ version, dosageName, categoryName }: Props) {
+export function GeneralInfoCard({ version, dosageName, categoryName, stageLabel, onEdit }: Props) {
   const fields: FieldDef[] = [
     { icon: Hash, label: 'Số đăng ký', value: version.registrationNo || '—' },
     { icon: Pill, label: 'Dạng bào chế', value: dosageName },
@@ -36,10 +39,15 @@ export function GeneralInfoCard({ version, dosageName, categoryName }: Props) {
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="text-base font-extrabold tracking-tight text-brand-900 sm:text-lg">Thông tin chung</h2>
             <Badge tone="blue">v{version.version}</Badge>
-            <Badge tone={stage.tone}>{stage.label}</Badge>
+            <Badge tone={stage.tone}>{stageLabel ?? stage.label}</Badge>
           </div>
           <p className="mt-0.5 text-xs text-muted sm:text-sm">Ảnh chụp dữ liệu hồ sơ theo phiên bản đang xem.</p>
         </div>
+        {onEdit && (
+          <Button size="sm" variant="secondary" icon={<Pencil className="size-4" />} onClick={onEdit} className="shrink-0">
+            Cập nhật
+          </Button>
+        )}
       </header>
 
       <div className="grid gap-x-6 gap-y-4 px-4 py-4 sm:grid-cols-2 sm:px-5 sm:py-5 2xl:grid-cols-3">

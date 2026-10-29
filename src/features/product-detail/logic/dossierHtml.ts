@@ -8,7 +8,9 @@ const stageTone = { current: 'blue', coming_soon: 'amber', archived: 'gray' } as
 export function buildDossierHtml(ctx: HtmlContext) {
   const { product: p, version: v, docs, versions, names } = ctx
   const legal = docsByGroup(docs, 'legal')
-  const usage = docsByGroup(docs, 'usage')
+  const usage = docsByGroup(docs, 'usage').filter((d) => !d.shared)
+  const sharedUsage = docsByGroup(docs, 'usage').filter((d) => d.shared)
+  const professional = docsByGroup(docs, 'professional')
   const technical = docsByGroup(docs, 'packaging')
   const specs = resolvePackagingSpecs(p, v)
   const specDocIds = new Set(specs.map((s) => s.technicalDoc.id))
@@ -62,6 +64,7 @@ export function buildDossierHtml(ctx: HtmlContext) {
           <li>Thông tin chung & thay đổi của phiên bản</li>
           <li>Hồ sơ pháp lý & quyết định phê duyệt (${legal.length} tài liệu)</li>
           <li>Hướng dẫn sử dụng & so sánh phiên bản (${usage.length} tài liệu)</li>
+          <li>Hồ sơ chuyên môn & HDSD dùng chung (${professional.length + sharedUsage.length} tài liệu)</li>
           <li>Quy cách đóng gói & hồ sơ kỹ thuật (${technical.length} tài liệu)</li>
           <li>Vòng đời phiên bản</li>
         </ol>
@@ -105,7 +108,12 @@ export function buildDossierHtml(ctx: HtmlContext) {
     <h2>4. Hồ sơ hướng dẫn sử dụng & so sánh phiên bản</h2>
     ${docTable(usage)}
 
-    <h2>5. Quản lý quy cách đóng gói & hồ sơ kỹ thuật</h2>
+    <h2>5. Hồ sơ chuyên môn & HDSD dùng chung</h2>
+    ${professional.length || sharedUsage.length
+      ? `${professional.length ? `<h3>Hồ sơ chuyên môn</h3>${docTable(professional)}` : ''}${sharedUsage.length ? `<h3>HDSD dùng chung</h3>${docTable(sharedUsage)}` : ''}`
+      : '<p class="muted">Chưa tải lên hồ sơ chuyên môn hoặc HDSD dùng chung cho phiên bản này.</p>'}
+
+    <h2>6. Quản lý quy cách đóng gói & hồ sơ kỹ thuật</h2>
     <p class="lead">Danh mục ${specs.length} quy cách đóng gói kèm hồ sơ kỹ thuật và ảnh chụp thực tế.</p>
     <table>
       <thead><tr><th style="width:8%">STT</th><th>Quy cách</th><th>Hồ sơ kỹ thuật</th><th style="width:14%">Ảnh chụp</th></tr></thead>

@@ -33,6 +33,7 @@ const FOLDER: Record<VersionDocument['group'], string> = {
   legal: '01-phap-ly',
   usage: '02-huong-dan-su-dung',
   packaging: '03-quy-cach-ky-thuat',
+  professional: '04-ho-so-chuyen-mon',
 }
 
 /** Tải toàn bộ hồ sơ của phiên bản: HTML tổng quan + từng tài liệu + JSON đầy đủ, đóng gói ZIP. */
@@ -51,9 +52,19 @@ export async function downloadVersionDossier(args: DossierArgs) {
     allVersions: args.versions,
   }, null, 2))
 
-  for (const group of ['legal', 'usage', 'packaging'] as const) {
+  for (const group of ['legal', 'usage', 'packaging', 'professional'] as const) {
     const folder = root.folder(FOLDER[group])!
-    docsByGroup(args.docs, group).forEach((doc, i) => {
+    docsByGroup(args.docs, group)
+      .filter((doc) => !(group === 'usage' && doc.shared))
+      .forEach((doc, i) => {
+        folder.file(`${String(i + 1).padStart(2, '0')}-${fileSlug(doc.name)}.html`, buildDocumentHtml(ctx, doc))
+      })
+  }
+
+  const sharedUsage = args.docs.filter((doc) => doc.group === 'usage' && doc.shared)
+  if (sharedUsage.length) {
+    const folder = root.folder('04-ho-so-chuyen-mon/hdsd-dung-chung')!
+    sharedUsage.forEach((doc, i) => {
       folder.file(`${String(i + 1).padStart(2, '0')}-${fileSlug(doc.name)}.html`, buildDocumentHtml(ctx, doc))
     })
   }

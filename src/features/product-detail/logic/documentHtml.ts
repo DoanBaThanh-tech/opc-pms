@@ -166,8 +166,42 @@ function packagingBody(ctx: HtmlContext, doc: VersionDocument) {
     <div class="callout">Hồ sơ kỹ thuật được kiểm soát phiên bản và chỉ có hiệu lực khi tương ứng với phiên bản đang được áp dụng.</div>`
 }
 
-function signatures(v: HtmlContext['version']) {
-  return `<div class="signatures">
+/** Tài liệu người dùng tải lên: chỉ có metadata ở chế độ mô phỏng. */
+function uploadedBody(ctx: HtmlContext, doc: VersionDocument) {
+  const v = ctx.version
+  return `
+    <p class="lead">Tài liệu <b>${escapeHtml(doc.name)}</b> được tải lên cho phiên bản <b>${escapeHtml(v.version)}</b> của sản phẩm <b>${escapeHtml(ctx.product.name)}</b>.</p>
+    ${infoGrid([
+      ['Mã tài liệu', doc.code],
+      ['Tệp gốc', doc.fileName || '—'],
+      ['Định dạng', doc.format.toUpperCase()],
+      ['Dung lượng', `${doc.sizeKb} KB`],
+      ['Số trang', `${doc.pages} trang`],
+      ['Ngày tải lên', formatDate(doc.updatedAt)],
+      ['Người tải lên', 'Phòng Đăng ký – OPC'],
+    ])}
+    <h2>Ghi chú</h2>
+    <p class="muted">${escapeHtml(doc.note ?? 'Không có ghi chú bổ sung cho tài liệu này.')}</p>
+    <div class="callout">Bản xem trước được sinh từ thông tin tệp tải lên ở môi trường mô phỏng. Khi kết nối hệ thống thật, nội dung tệp gốc sẽ được hiển thị tại đây.</div>`
+}
+
+function professionalBody(ctx: HtmlContext, doc: VersionDocument) {
+  return `
+    <p class="lead">Hồ sơ chuyên môn của sản phẩm <b>${escapeHtml(ctx.product.name)}</b> – phiên bản <b>${escapeHtml(ctx.version.version)}</b>.</p>
+    <h2>Thông tin hồ sơ</h2>
+    ${infoGrid([
+      ['Tên hồ sơ', doc.name],
+      ['Mã hồ sơ', doc.code],
+      ['Hoạt chất & hàm lượng', ctx.version.activeIngredients],
+      ['Dạng bào chế', ctx.names.dosage],
+      ['Phân loại', ctx.names.category],
+      ['Quy cách đóng gói', ctx.version.packaging],
+    ])}
+    <h2>Phạm vi áp dụng</h2>
+    <p>Hồ sơ chuyên môn được dùng chung cho các quy cách đóng gói của phiên bản và là căn cứ đối chiếu khi thẩm định, kiểm nghiệm và cập nhật hồ sơ kỹ thuật.</p>`
+}
+
+function signatures(v: HtmlContext['version']) {  return `<div class="signatures">
     <div><b>Người lập hồ sơ</b><div class="sign-space"></div><span>${escapeHtml(v.stage === 'coming_soon' ? 'Đang chuẩn bị' : 'Phòng Đăng ký')}</span></div>
     <div><b>Trưởng phòng QA</b><div class="sign-space"></div><span>Kiểm tra & xác nhận</span></div>
     <div><b>Giám đốc / Người được ủy quyền</b><div class="sign-space"></div><span>Phê duyệt</span></div>
@@ -178,7 +212,15 @@ const stampText = { current: '', coming_soon: 'BẢN XEM TRƯỚC', archived: 'L
 
 export function buildDocumentHtml(ctx: HtmlContext, doc: VersionDocument) {
   const v = ctx.version
-  const body = doc.group === 'legal' ? legalBody(ctx, doc) : doc.group === 'usage' ? usageBody(ctx, doc) : packagingBody(ctx, doc)
+  const body = doc.uploaded
+    ? uploadedBody(ctx, doc)
+    : doc.group === 'legal'
+      ? legalBody(ctx, doc)
+      : doc.group === 'usage'
+        ? usageBody(ctx, doc)
+        : doc.group === 'professional'
+          ? professionalBody(ctx, doc)
+          : packagingBody(ctx, doc)
   return `<!doctype html>
 <html lang="vi">
 <head>

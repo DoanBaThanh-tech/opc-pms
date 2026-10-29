@@ -5,12 +5,13 @@ import type { ProductVersion } from '../logic/types'
 interface Props {
   versions: ProductVersion[]
   selectedId: number | null
+  creating?: boolean
   onPreview: (version: ProductVersion) => void
   onCreate: () => void
 }
 
 /** Dòng thời gian phiên bản – đặt ở cột phải để luôn nhìn thấy khi mở hồ sơ. */
-export function LifecyclePanel({ versions, selectedId, onPreview, onCreate }: Props) {
+export function LifecyclePanel({ versions, selectedId, creating, onPreview, onCreate }: Props) {
   const comingCount = versions.filter((v) => v.stage === 'coming_soon').length
 
   return (
@@ -104,7 +105,7 @@ export function LifecyclePanel({ versions, selectedId, onPreview, onCreate }: Pr
       </div>
 
       <footer className="shrink-0 border-t border-line bg-white px-4 py-3">
-        <Button variant="secondary" size="sm" icon={<Plus className="size-4" />} onClick={onCreate} className="w-full">
+        <Button variant="secondary" size="sm" icon={<Plus className="size-4" />} loading={creating} onClick={onCreate} className="w-full">
           Tạo phiên bản mới
         </Button>
         <p className="mt-1.5 text-center text-[10px] text-muted">{metaHint(versions)}</p>

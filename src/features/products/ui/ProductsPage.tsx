@@ -14,6 +14,7 @@ import { useLookups } from '../logic/useLookups'
 import { useChangeStatus, useProducts } from '../logic/useProducts'
 import { ProductFilters } from './ProductFilters'
 import { ProductFormModal } from './ProductFormModal'
+import { ProductSearchBar } from './ProductSearchBar'
 import { ProductStats } from './ProductStats'
 import { buildProductColumns } from './productColumns'
 
@@ -22,7 +23,7 @@ export default function ProductsPage() {
   const navigate = useNavigate()
   const { data: products = [], isLoading } = useProducts()
   const lookups = useLookups()
-  const f = useProductFilters(products)
+  const f = useProductFilters(products, lookups)
   const changeStatus = useChangeStatus()
   const [formOpen, setFormOpen] = useState(false)
   const [editing, setEditing] = useState<Product | null>(null)
@@ -62,6 +63,12 @@ export default function ProductsPage() {
           <Button variant="secondary" icon={<Download className="size-4" />} loading={exporting} disabled={f.filtered.length === 0} onClick={handleExport}>Xuất Excel</Button>
           <Button icon={<Plus className="size-4" />} onClick={() => openForm(null)}>Thêm sản phẩm</Button>
         </>}
+      />
+      <ProductSearchBar
+        value={f.filters.keyword}
+        onChange={(value) => f.setFilter('keyword', value)}
+        onSelect={(p) => navigate(`/products/${p.id}`)}
+        className="mb-4"
       />
       <ProductStats products={products} />
       <ProductFilters filters={f.filters} onChange={f.setFilter} onReset={f.reset} hasFilter={f.hasFilter} dosageForms={lookups.dosageForms} categories={lookups.categories} />

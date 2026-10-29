@@ -15,6 +15,7 @@ interface Props {
   categoryName: string
   docsCount: number
   downloading: boolean
+  creating?: boolean
   onSelect: (versionId: number) => void
   onCreate: () => void
   onDownload: () => void
@@ -28,7 +29,7 @@ const STATUS_DOT: Record<ProductStatus, string> = {
   discontinued: 'bg-slate-400',
 }
 
-export function DetailHero({ product, version, versions, dosageName, categoryName, docsCount, downloading, onSelect, onCreate, onDownload }: Props) {
+export function DetailHero({ product, version, versions, dosageName, categoryName, docsCount, downloading, creating, onSelect, onCreate, onDownload }: Props) {
   const [pendingId, setPendingId] = useState(String(version.id))
 
   const apply = () => {
@@ -83,7 +84,7 @@ export function DetailHero({ product, version, versions, dosageName, categoryNam
 
         <div className="w-full shrink-0 space-y-3 lg:w-[21.5rem]">
           <div className="flex flex-col gap-2 sm:flex-row">
-            <Button variant="light" icon={<Plus className="size-4" />} onClick={onCreate} className="flex-[1.35] whitespace-nowrap">Tạo phiên bản mới</Button>
+            <Button variant="light" icon={<Plus className="size-4" />} loading={creating} onClick={onCreate} className="flex-[1.35] whitespace-nowrap">Tạo phiên bản mới</Button>
             <Button variant="glass" icon={<Download className="size-4" />} loading={downloading} onClick={onDownload} className="flex-1 whitespace-nowrap">Tải hồ sơ</Button>
           </div>
 
