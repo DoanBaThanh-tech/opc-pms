@@ -1,5 +1,6 @@
 import type { Product } from '@/features/products/logic/types'
 import { seedProducts } from '@/features/products/logic/seed'
+import { buildPackagingSpecs } from './packagingSpecs'
 import type { ProductVersion, VersionChange } from './types'
 
 const SITES: Record<number, { manufacturer: string; manufacturingMethod: string }> = {
@@ -51,7 +52,7 @@ function versionOf(
   changes: VersionChange[],
   overrides: Partial<ProductVersion> = {},
 ): ProductVersion {
-  return {
+  const resolved: ProductVersion = {
     ...baseOf(p),
     id,
     version: p.version,
@@ -63,6 +64,7 @@ function versionOf(
     approvalNo: `QĐ-${p.code}-${p.version}`,
     ...overrides,
   }
+  return { ...resolved, packagingSpecs: overrides.packagingSpecs ?? buildPackagingSpecs(p, resolved) }
 }
 
 const current1 = versionOf(seedProducts[0], 'current', 100, [

@@ -5,6 +5,7 @@ import { buildDocumentHtml } from './documentHtml'
 import { docsByGroup } from './documents'
 import type { HtmlContext } from './htmlShared'
 import { getLogoDataUrl } from './logo'
+import { resolvePackagingSpecs } from './packagingSpecs'
 import type { ProductVersion, VersionDocument } from './types'
 
 export interface DossierArgs {
@@ -56,6 +57,14 @@ export async function downloadVersionDossier(args: DossierArgs) {
       folder.file(`${String(i + 1).padStart(2, '0')}-${fileSlug(doc.name)}.html`, buildDocumentHtml(ctx, doc))
     })
   }
+
+  const photoFolder = root.folder('03-quy-cach-ky-thuat/anh-chup')!
+  resolvePackagingSpecs(args.product, args.version).forEach((spec, i) => {
+    const match = spec.photo?.url.match(/^data:image\/(png|jpe?g|webp|gif);base64,(.+)$/i)
+    if (!match) return
+    const ext = match[1].toLowerCase().replace('jpeg', 'jpg')
+    photoFolder.file(`${String(i + 1).padStart(2, '0')}-${fileSlug(spec.name)}.${ext}`, match[2], { base64: true })
+  })
 
   const blob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 6 } })
   downloadBlob(`${baseName(args.product, args.version)}_ho-so-day-du.zip`, blob)

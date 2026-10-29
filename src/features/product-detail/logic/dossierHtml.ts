@@ -1,6 +1,7 @@
 import { formatDate } from '@/core/utils/format'
 import { badge, changeTable, docTable, escapeHtml, footer, htmlStyles, infoGrid, letterhead, stageLabel, type HtmlContext } from './htmlShared'
 import { docsByGroup } from './documents'
+import { resolvePackagingSpecs } from './packagingSpecs'
 
 const stageTone = { current: 'blue', coming_soon: 'amber', archived: 'gray' } as const
 
@@ -9,6 +10,9 @@ export function buildDossierHtml(ctx: HtmlContext) {
   const legal = docsByGroup(docs, 'legal')
   const usage = docsByGroup(docs, 'usage')
   const technical = docsByGroup(docs, 'packaging')
+  const specs = resolvePackagingSpecs(p, v)
+  const specDocIds = new Set(specs.map((s) => s.technicalDoc.id))
+  const sharedTechnical = technical.filter((d) => !specDocIds.has(d.id))
 
   const lifecycle = versions.map((item) => {
     const tone = item.stage === 'coming_soon' ? 'next' : item.stage === 'archived' ? 'old' : ''
@@ -28,8 +32,8 @@ export function buildDossierHtml(ctx: HtmlContext) {
   <style>${htmlStyles}</style>
 </head>
 <body>
-  <div class="no-print" style="position:fixed;right:18px;top:18px;z-index:9">
-    <button onclick="window.print()" style="border:0;border-radius:12px;background:linear-gradient(135deg,#0284c7,#0369a1);color:#fff;font:600 13px 'Segoe UI',sans-serif;padding:11px 18px;cursor:pointer;box-shadow:0 8px 22px rgba(2,132,199,.35)">In / Lưu PDF</button>
+  <div class="no-print print-fab">
+    <button class="print-btn" onclick="window.print()">In / Lưu PDF</button>
   </div>
 
   <div class="page">
@@ -102,7 +106,29 @@ export function buildDossierHtml(ctx: HtmlContext) {
     ${docTable(usage)}
 
     <h2>5. Quản lý quy cách đóng gói & hồ sơ kỹ thuật</h2>
-    ${docTable(technical)}
+    <p class="lead">Danh mục ${specs.length} quy cách đóng gói kèm hồ sơ kỹ thuật và ảnh chụp thực tế.</p>
+    <table>
+      <thead><tr><th style="width:8%">STT</th><th>Quy cách</th><th>Hồ sơ kỹ thuật</th><th style="width:14%">Ảnh chụp</th></tr></thead>
+      <tbody>${specs.map((spec, i) => `<tr>
+        <td><b>${String(i + 1).padStart(2, '0')}</b></td>
+        <td><b>${escapeHtml(spec.name)}</b>${spec.note ? `<br /><span class="muted">${escapeHtml(spec.note)}</span>` : ''}</td>
+        <td>${escapeHtml(spec.technicalDoc.name)}<br /><span class="muted">${escapeHtml(spec.technicalDoc.code)} · ${spec.technicalDoc.pages} trang</span></td>
+        <td>${spec.photo ? 'Đã cập nhật' : 'Chưa cập nhật'}</td>
+      </tr>`).join('')}</tbody>
+    </table>
+    ${specs.map((spec, i) => `<div style="display:grid;grid-template-columns:1fr 64mm;gap:14px;align-items:start;border:1px solid #dbe8f3;border-radius:12px;padding:12px;margin:10px 0">
+      <div>
+        <p class="eyebrow" style="margin-bottom:2px">Quy cách ${String(i + 1).padStart(2, '0')}</p>
+        <h3 style="margin:0 0 4px">${escapeHtml(spec.name)}</h3>
+        ${spec.note ? `<p class="muted" style="margin:0 0 6px">${escapeHtml(spec.note)}</p>` : ''}
+        <p style="margin:0;font-size:12px"><b>Hồ sơ kỹ thuật:</b> ${escapeHtml(spec.technicalDoc.name)}</p>
+        <p class="muted" style="margin:2px 0 0;font-size:11px">${escapeHtml(spec.technicalDoc.code)} · ${spec.technicalDoc.pages} trang · ${formatDate(spec.technicalDoc.updatedAt)}</p>
+      </div>
+      <div>${spec.photo
+        ? `<img src="${escapeHtml(spec.photo.url)}" alt="${escapeHtml(spec.photo.fileName)}" style="width:100%;max-height:52mm;object-fit:contain;border:1px solid #dbe8f3;border-radius:8px;background:#f6fbff" />`
+        : '<div class="muted" style="border:1px dashed #dbe8f3;border-radius:8px;padding:16px;text-align:center;font-size:11px">Chưa có ảnh chụp thực tế</div>'}</div>
+    </div>`).join('')}
+    ${sharedTechnical.length ? `<h3>Hồ sơ kỹ thuật dùng chung</h3>${docTable(sharedTechnical)}` : ''}
     ${footer(p, v)}
   </div>
 

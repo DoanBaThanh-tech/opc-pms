@@ -78,6 +78,25 @@ export const htmlStyles = `
   .doc-line b { display:block; font-size:12.5px; }
   .doc-line span { color:var(--muted); font-size:11px; }
   .sign-line { margin-top:18px; font-size:12px; }
+  .print-fab { position:fixed; right:18px; top:18px; z-index:9; }
+  .print-btn { border:0; border-radius:12px; background:linear-gradient(135deg,#0284c7,#0369a1); color:#fff; font:600 13px "Segoe UI",system-ui,sans-serif; padding:11px 18px; cursor:pointer; box-shadow:0 8px 22px rgba(2,132,199,.35); }
+  @media screen and (max-width: 760px) {
+    body { background:#fff; }
+    .page { width:auto; min-height:auto; margin:0; padding:20px 16px 28px; box-shadow:none; }
+    .letterhead { flex-direction:column; gap:10px; }
+    .company { text-align:left; }
+    h1 { font-size:21px; }
+    .cover { min-height:auto; padding-top:20px; }
+    .cover h1 { font-size:27px; }
+    .meta-grid, .two-col, .signatures, .cover .cover-meta { grid-template-columns:1fr; gap:0; }
+    .cover .cover-meta { gap:10px; }
+    .stamp { position:static; display:inline-block; margin:12px 0; }
+    .signatures { gap:18px; margin-top:28px; }
+    .sign-space { height:36px; }
+    .footer { position:static; margin-top:28px; }
+    .print-fab { position:static; display:flex; justify-content:flex-end; padding:12px 16px 0; }
+    th, td { padding:6px 8px; }
+  }
   @media print {
     body { background:#fff; }
     .page { width:auto; min-height:auto; margin:0; padding:0; box-shadow:none; }

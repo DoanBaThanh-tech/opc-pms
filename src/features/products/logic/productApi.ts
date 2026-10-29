@@ -3,6 +3,7 @@ import { endpoints } from '@/core/api/endpoints'
 import { createMockCollection, mockError } from '@/core/api/mock'
 import { env } from '@/core/config/env'
 import { logHistory, type HistoryAction } from '@/features/history/logic/historyApi'
+import type { PackagingSpec } from '@/features/product-detail/logic/types'
 import { seedProducts } from './seed'
 import type { Product, ProductInput, ProductStatus } from './types'
 
@@ -36,6 +37,7 @@ function syncCurrentVersionSnapshot(product: Product) {
     const next = versions.map((v) => {
       if (v.productId !== product.id || v.stage !== 'current') return v
       changed = true
+      const specs = Array.isArray(v.packagingSpecs) ? (v.packagingSpecs as PackagingSpec[]) : undefined
       return {
         ...v,
         registrationNo: product.registrationNo,
@@ -47,6 +49,11 @@ function syncCurrentVersionSnapshot(product: Product) {
         activeIngredients: product.activeIngredients,
         updatedAt: product.updatedAt,
         approvalNo: `QĐ-${product.code}-${v.version}`,
+        packagingSpecs: specs?.length
+          ? specs.map((s, i) => (i === 0 && product.packaging
+            ? { ...s, name: product.packaging, technicalDoc: { ...s.technicalDoc, name: `Hồ sơ kỹ thuật – ${product.packaging}` } }
+            : s))
+          : v.packagingSpecs,
       }
     })
     if (changed) localStorage.setItem('opc_mock_product_versions', JSON.stringify(next))

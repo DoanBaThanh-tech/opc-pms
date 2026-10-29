@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { versionApi } from './versionApi'
-import type { CreateVersionInput } from './types'
+import type { CreateVersionInput, PackagingSpec } from './types'
 
 const key = (productId: number) => ['product-versions', productId]
 
@@ -35,5 +35,14 @@ export function useActivateVersion(productId: number) {
   return useMutation({
     mutationFn: (versionId: number) => versionApi.activate(productId, versionId),
     onSuccess: refresh,
+  })
+}
+
+export function useSavePackagingSpecs(productId: number) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ versionId, specs }: { versionId: number; specs: PackagingSpec[] }) =>
+      versionApi.savePackagingSpecs(productId, versionId, specs),
+    onSuccess: () => qc.invalidateQueries({ queryKey: key(productId) }),
   })
 }

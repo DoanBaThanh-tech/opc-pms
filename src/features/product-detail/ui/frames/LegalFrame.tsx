@@ -8,10 +8,11 @@ import { DocumentList } from './DocumentList'
 interface Props {
   version: ProductVersion
   docs: VersionDocument[]
+  onView: (doc: VersionDocument) => void
   onDownload: (doc: VersionDocument) => void
 }
 
-export function LegalFrame({ version, docs, onDownload }: Props) {
+export function LegalFrame({ version, docs, onView, onDownload }: Props) {
   const stage = STAGE_META[version.stage]
   const draft = version.stage === 'coming_soon'
   return (
@@ -40,7 +41,7 @@ export function LegalFrame({ version, docs, onDownload }: Props) {
           <Badge tone={stage.tone}>{stage.label}</Badge>
         </div>
       </div>
-      <DocumentList docs={docs} onDownload={onDownload} />
+      <DocumentList docs={docs} onView={onView} onDownload={onDownload} />
     </Frame>
   )
 }

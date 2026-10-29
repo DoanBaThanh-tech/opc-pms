@@ -14,6 +14,7 @@ import { useActivateVersion, useCreateVersion, useProductVersions } from '../log
 import { getCurrentVersion, previousVersionOf, sortVersions, suggestNextVersionAfter } from '../logic/versionUtils'
 import { CreateVersionModal } from './CreateVersionModal'
 import { DetailHero } from './DetailHero'
+import { DocumentViewerModal } from './DocumentViewerModal'
 import { GeneralInfoCard } from './GeneralInfoCard'
 import { LifecyclePanel } from './LifecyclePanel'
 import { VersionNotice } from './VersionNotice'
@@ -37,6 +38,7 @@ export default function ProductDetailPage() {
   const [previewId, setPreviewId] = useState<number | null>(null)
   const [createOpen, setCreateOpen] = useState(false)
   const [pendingActivate, setPendingActivate] = useState<ProductVersion | null>(null)
+  const [viewerDoc, setViewerDoc] = useState<VersionDocument | null>(null)
   const [downloading, setDownloading] = useState(false)
 
   const product = products.find((p) => p.id === productId)
@@ -169,9 +171,9 @@ export default function ProductDetailPage() {
         </aside>
 
         <div className="space-y-5 xl:col-start-1 xl:row-start-2">
-          <LegalFrame version={selected} docs={docsByGroup(docs, 'legal')} onDownload={handleDownloadDoc} />
-          <UsageFrame version={selected} previous={previous} docs={docsByGroup(docs, 'usage')} onDownload={handleDownloadDoc} />
-          <PackagingFrame version={selected} docs={docsByGroup(docs, 'packaging')} onDownload={handleDownloadDoc} />
+          <LegalFrame version={selected} docs={docsByGroup(docs, 'legal')} onView={setViewerDoc} onDownload={handleDownloadDoc} />
+          <UsageFrame version={selected} previous={previous} docs={docsByGroup(docs, 'usage')} onView={setViewerDoc} onDownload={handleDownloadDoc} />
+          <PackagingFrame product={product} version={selected} docs={docsByGroup(docs, 'packaging')} onView={setViewerDoc} onDownload={handleDownloadDoc} />
         </div>
       </div>
 
@@ -193,6 +195,16 @@ export default function ProductDetailPage() {
         onClose={() => setPreviewId(null)}
         onDownload={() => handleDownloadVersion(previewVersion, previewDocs, previewPrevious)}
         onActivate={() => previewVersion && requestActivate(previewVersion)}
+      />
+
+      <DocumentViewerModal
+        open={!!viewerDoc}
+        doc={viewerDoc}
+        product={product}
+        version={selected}
+        names={names}
+        onClose={() => setViewerDoc(null)}
+        onDownload={handleDownloadDoc}
       />
 
       <ConfirmDialog

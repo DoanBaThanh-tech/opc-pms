@@ -31,6 +31,8 @@ export interface ProductVersion {
   activeIngredients: string
   approvalNo: string
   approvedBy: string
+  /** Danh sách quy cách đóng gói của phiên bản (nếu chưa có sẽ sinh từ dữ liệu phiên bản). */
+  packagingSpecs?: PackagingSpec[]
 }
 
 export type DocGroup = 'legal' | 'usage' | 'packaging'
@@ -48,6 +50,22 @@ export interface VersionDocument {
   updatedAt: string
   status: DocStatus
   note?: string
+}
+
+/** Ảnh chụp thực tế của quy cách đóng gói (lưu data URL ở FE mock). */
+export interface PackagingPhoto {
+  url: string
+  fileName: string
+  updatedAt: string
+}
+
+/** Một quy cách đóng gói – mỗi quy cách có STT, hồ sơ kỹ thuật và ảnh chụp. */
+export interface PackagingSpec {
+  id: string
+  name: string
+  note?: string
+  technicalDoc: VersionDocument
+  photo?: PackagingPhoto
 }
 
 export interface CreateVersionInput {

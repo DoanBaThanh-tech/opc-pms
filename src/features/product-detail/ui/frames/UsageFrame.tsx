@@ -9,6 +9,7 @@ interface Props {
   version: ProductVersion
   previous?: ProductVersion
   docs: VersionDocument[]
+  onView: (doc: VersionDocument) => void
   onDownload: (doc: VersionDocument) => void
 }
 
@@ -18,7 +19,7 @@ const KIND_META = {
   removed: { label: 'Loại bỏ', cls: 'bg-red-100 text-red-700' },
 }
 
-export function UsageFrame({ version, previous, docs, onDownload }: Props) {
+export function UsageFrame({ version, previous, docs, onView, onDownload }: Props) {
   const compareDocs = docs.filter((d) => d.name.startsWith('Báo cáo so sánh'))
   const usageDocs = docs.filter((d) => !d.name.startsWith('Báo cáo so sánh'))
 
@@ -34,13 +35,13 @@ export function UsageFrame({ version, previous, docs, onDownload }: Props) {
           <h3 className="mb-1 flex items-center gap-2 px-2 text-xs font-bold uppercase tracking-wide text-muted">
             <BookOpenCheck className="size-3.5 text-brand-500" /> Hướng dẫn sử dụng
           </h3>
-          <DocumentList docs={usageDocs} onDownload={onDownload} />
+          <DocumentList docs={usageDocs} onView={onView} onDownload={onDownload} />
         </section>
         <section>
           <h3 className="mb-1 flex items-center gap-2 px-2 text-xs font-bold uppercase tracking-wide text-muted">
             <GitCompare className="size-3.5 text-brand-500" /> So sánh phiên bản
           </h3>
-          <DocumentList docs={compareDocs} onDownload={onDownload} emptyText="Chưa có báo cáo so sánh cho phiên bản này." />
+          <DocumentList docs={compareDocs} onView={onView} onDownload={onDownload} emptyText="Chưa có báo cáo so sánh cho phiên bản này." />
         </section>
       </div>
 

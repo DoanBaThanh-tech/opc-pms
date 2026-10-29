@@ -1,4 +1,5 @@
 import type { Product } from '@/features/products/logic/types'
+import { resolvePackagingSpecs } from './packagingSpecs'
 import type { ProductVersion, VersionDocument } from './types'
 
 const STATUS_BY_STAGE = {
@@ -40,6 +41,7 @@ export function buildDocuments(product: Product, version: ProductVersion, previo
     doc('packaging', 'Bản vẽ quy cách đóng gói', `BV-PKG-${code}-${v.replace(/\./g, '')}`, 'pdf', 1180, 4),
     doc('packaging', 'Hồ sơ kỹ thuật CT1 – CT2', `HSKT-${code}-${v.replace(/\./g, '')}`, 'pdf', 2460, 18, 'Bao gồm công thức, quy trình sản xuất và tiêu chuẩn nguyên liệu.'),
     doc('packaging', 'Tiêu chuẩn cơ sở & phiếu kiểm nghiệm', `TCCS-${code}`, 'xlsx', 196, 12),
+    ...resolvePackagingSpecs(product, version).map((spec) => spec.technicalDoc),
   ]
 }
 

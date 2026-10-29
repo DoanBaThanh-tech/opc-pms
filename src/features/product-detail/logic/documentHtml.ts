@@ -188,8 +188,8 @@ export function buildDocumentHtml(ctx: HtmlContext, doc: VersionDocument) {
   <style>${htmlStyles}</style>
 </head>
 <body>
-  <div class="no-print" style="position:fixed;right:18px;top:18px;z-index:9">
-    <button onclick="window.print()" style="border:0;border-radius:12px;background:linear-gradient(135deg,#0284c7,#0369a1);color:#fff;font:600 13px 'Segoe UI',sans-serif;padding:11px 18px;cursor:pointer;box-shadow:0 8px 22px rgba(2,132,199,.35)">In / Lưu PDF</button>
+  <div class="no-print print-fab">
+    <button class="print-btn" onclick="window.print()">In / Lưu PDF</button>
   </div>
   <div class="page">
     ${stampText[v.stage] ? `<div class="stamp">${stampText[v.stage]}</div>` : ''}

@@ -5,8 +5,9 @@ import { env } from '@/core/config/env'
 import { formatDate } from '@/core/utils/format'
 import { logHistory } from '@/features/history/logic/historyApi'
 import { productsDb } from '@/features/products/logic/productApi'
+import { clonePackagingSpecsForVersion } from './packagingSpecs'
 import { baselineVersionFor, seedVersions } from './seedVersions'
-import type { CreateVersionInput, ProductVersion } from './types'
+import type { CreateVersionInput, PackagingSpec, ProductVersion } from './types'
 import { sortVersions } from './versionUtils'
 
 export const versionsDb = createMockCollection<ProductVersion>('product_versions', seedVersions)
@@ -65,23 +66,36 @@ export const versionApi = {
       autoChanges.push({ field: 'Hạn dùng', before: base.shelfLife, after: input.shelfLife.trim(), kind: 'updated' })
     }
 
+    const nextVersion = input.version.trim()
+    const createdAt = now()
     const created = await versionsDb.create({
       ...stripId(base),
-      version: input.version.trim(),
+      version: nextVersion,
       basedOnVersion: base.version,
       stage: 'coming_soon',
       effectiveDate: input.effectiveDate,
-      updatedAt: now(),
+      updatedAt: createdAt,
       summary: input.summary.trim(),
       changes: [...autoChanges, ...input.customChanges],
       activeIngredients: input.activeIngredients.trim(),
       packaging: input.packaging.trim(),
       shelfLife: input.shelfLife.trim(),
-      approvalNo: `QĐ-${product.code}-${input.version.trim()}`,
+      approvalNo: `QĐ-${product.code}-${nextVersion}`,
       approvedBy: 'Hội đồng thẩm định OPC (dự kiến)',
+      packagingSpecs: clonePackagingSpecsForVersion(product, base, nextVersion, 'coming_soon', createdAt, input.packaging.trim()),
     })
     logHistory({ ...product, version: created.version }, 'updated', `Tạo phiên bản ${created.version} (đang chờ áp dụng)`)
     return created
+  },
+
+  savePackagingSpecs: async (productId: number, versionId: number, specs: PackagingSpec[]): Promise<ProductVersion> => {
+    if (!env.useMock) {
+      return http.put<ProductVersion>(`${endpoints.products}/${productId}/versions/${versionId}/packaging-specs`, { specs })
+    }
+    const target = versionsDb.snapshot().find((v) => v.id === versionId && v.productId === productId)
+    if (!target) throw mockError('Không tìm thấy phiên bản.', 404)
+    if (target.stage === 'archived') throw mockError('Phiên bản lưu trữ chỉ được xem, không thể chỉnh sửa quy cách đóng gói.', 409)
+    return versionsDb.patch(versionId, { packagingSpecs: specs })
   },
 
   activate: async (productId: number, versionId: number): Promise<ProductVersion> => {
