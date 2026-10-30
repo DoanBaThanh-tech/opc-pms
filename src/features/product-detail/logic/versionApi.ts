@@ -8,6 +8,7 @@ import { productsDb } from '@/features/products/logic/productApi'
 import { clonePackagingSpecsForVersion } from './packagingSpecs'
 import { baselineVersionFor, seedVersions } from './seedVersions'
 import type { CreateVersionInput, PackagingSpec, ProductVersion, UpdateVersionInfoInput, VersionDocument } from './types'
+import { applyVersionInfo } from './versionUpdates'
 import { compareVersion, isVersionDue, sortVersions } from './versionUtils'
 
 export const versionsDb = createMockCollection<ProductVersion>('product_versions', seedVersions)
@@ -86,25 +87,56 @@ export const versionApi = {
     if (input.shelfLife.trim() !== base.shelfLife) {
       autoChanges.push({ field: 'Hạn dùng', before: base.shelfLife, after: input.shelfLife.trim(), kind: 'updated' })
     }
+    if (input.regulation.trim() !== base.regulation) {
+      autoChanges.push({ field: 'Quy định', before: base.regulation, after: input.regulation.trim(), kind: 'updated' })
+    }
+    if (input.manufacturer.trim() !== base.manufacturer) {
+      autoChanges.push({ field: 'Nơi sản xuất', before: base.manufacturer, after: input.manufacturer.trim(), kind: 'updated' })
+    }
+    if (input.manufacturingMethod.trim() !== base.manufacturingMethod) {
+      autoChanges.push({ field: 'Cách thức sản xuất', before: base.manufacturingMethod, after: input.manufacturingMethod.trim(), kind: 'updated' })
+    }
 
     const nextVersion = input.version.trim()
     const createdAt = now()
+    const compact = compactVersion(nextVersion)
+    const sourceSpecs = input.packagingSpecs?.length
+      ? input.packagingSpecs
+      : clonePackagingSpecsForVersion(product, base, nextVersion, 'coming_soon', createdAt, input.packaging.trim())
+    const packagingSpecs: PackagingSpec[] = sourceSpecs.map((spec, i) => ({
+      ...spec,
+      id: `spec-${product.id}-${compact}-${i + 1}`,
+      technicalDoc: {
+        ...spec.technicalDoc,
+        id: `spec-${product.id}-${compact}-${i + 1}-doc`,
+        code: `HSKT-${product.code}-${compact}-${String(i + 1).padStart(2, '0')}`,
+        status: 'draft',
+        updatedAt: createdAt,
+      },
+    }))
+
     const created = await versionsDb.create({
       ...stripId(base),
       version: nextVersion,
       basedOnVersion: base.version,
       stage: 'coming_soon',
       effectiveDate: input.effectiveDate,
+      effectiveEndDate: input.endDate,
       updatedAt: createdAt,
       summary: input.summary.trim(),
       changes: [...autoChanges, ...input.customChanges],
       activeIngredients: input.activeIngredients.trim(),
+      dosageFormId: input.dosageFormId,
+      categoryId: input.categoryId,
       packaging: input.packaging.trim(),
       shelfLife: input.shelfLife.trim(),
+      regulation: input.regulation.trim(),
+      manufacturer: input.manufacturer.trim(),
+      manufacturingMethod: input.manufacturingMethod.trim(),
       approvalNo: `QĐ-${product.code}-${nextVersion}`,
       approvedBy: 'Hội đồng thẩm định OPC (dự kiến)',
-      packagingSpecs: clonePackagingSpecsForVersion(product, base, nextVersion, 'coming_soon', createdAt, input.packaging.trim()),
-      extraDocs: [],
+      packagingSpecs,
+      extraDocs: (input.extraDocs ?? []).map((doc) => ({ ...doc, status: 'draft' })),
     })
     logHistory({ ...product, version: created.version }, 'updated', `Tạo phiên bản ${created.version} (đang chờ áp dụng)`)
     return created
@@ -134,24 +166,7 @@ export const versionApi = {
     )
     if (duplicated) throw mockError(`Phiên bản ${nextVersion} đã tồn tại.`, 409)
 
-    const compact = compactVersion(nextVersion)
-    const packagingSpecs = target.packagingSpecs?.map((s, i) => ({
-      ...s,
-      name: i === 0 && input.packaging.trim() ? input.packaging.trim() : s.name,
-      technicalDoc: {
-        ...s.technicalDoc,
-        code: `HSKT-${product.code}-${compact}-${String(i + 1).padStart(2, '0')}`,
-        name: i === 0 && input.packaging.trim() ? `Hồ sơ kỹ thuật – ${input.packaging.trim()}` : s.technicalDoc.name,
-      },
-    }))
-
-    const updated = versionsDb.patch(versionId, {
-      ...input,
-      version: nextVersion,
-      approvalNo: `QĐ-${product.code}-${nextVersion}`,
-      packagingSpecs,
-      updatedAt: now(),
-    })
+    const updated = versionsDb.patch(versionId, applyVersionInfo(target, input, product.code, now()))
 
     if (target.stage === 'current') {
       const productUpdated = productsDb.patch(productId, {

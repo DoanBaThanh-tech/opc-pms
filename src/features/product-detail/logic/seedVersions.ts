@@ -2,6 +2,7 @@ import type { Product } from '@/features/products/logic/types'
 import { seedProducts } from '@/features/products/logic/seed'
 import { buildPackagingSpecs } from './packagingSpecs'
 import type { ProductVersion, VersionChange } from './types'
+import { addMonths } from './versionUtils'
 
 const SITES: Record<number, { manufacturer: string; manufacturingMethod: string }> = {
   1: {
@@ -58,6 +59,7 @@ function versionOf(
     version: p.version,
     stage,
     effectiveDate: p.updatedAt,
+    effectiveEndDate: addMonths(p.updatedAt, 24),
     updatedAt: p.updatedAt,
     summary: `Phiên bản ${p.version} đang được lưu hành với ${p.packaging || 'quy cách hiện hành'}. Hồ sơ pháp lý và hướng dẫn sử dụng đã được phê duyệt.`,
     changes,

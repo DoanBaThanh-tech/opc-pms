@@ -7,6 +7,7 @@ import { Select } from '@/core/components/Select'
 import { Textarea } from '@/core/components/Textarea'
 import type { CatalogItem } from '@/core/types/catalog'
 import type { ProductVersion, UpdateVersionInfoInput } from '../logic/types'
+import { versionEndDate } from '../logic/versionUtils'
 
 interface Props {
   open: boolean
@@ -22,6 +23,7 @@ export function EditVersionInfoModal({ open, version, dosageForms, categories, s
   const [form, setForm] = useState<UpdateVersionInfoInput>({
     version: version.version,
     effectiveDate: version.effectiveDate.slice(0, 10),
+    endDate: versionEndDate(version).slice(0, 10),
     activeIngredients: version.activeIngredients,
     dosageFormId: version.dosageFormId,
     categoryId: version.categoryId,
@@ -39,7 +41,9 @@ export function EditVersionInfoModal({ open, version, dosageForms, categories, s
 
   const submit = () => {
     if (!/^\d+(\.\d+){0,3}$/.test(form.version.trim())) { setError('Số phiên bản hợp lệ: 2.2 hoặc 2.2.1'); return }
-    if (!form.effectiveDate) { setError('Chọn ngày hiệu lực.'); return }
+    if (!form.effectiveDate) { setError('Chọn ngày bắt đầu hiệu lực.'); return }
+    if (!form.endDate) { setError('Chọn ngày kết thúc hiệu lực.'); return }
+    if (form.endDate < form.effectiveDate) { setError('Ngày kết thúc hiệu lực phải sau hoặc bằng ngày bắt đầu.'); return }
     if (!form.activeIngredients.trim()) { setError('Nhập hoạt chất & hàm lượng.'); return }
     if (!form.summary.trim()) { setError('Nhập tóm tắt nội dung phiên bản.'); return }
     onSubmit({
@@ -73,9 +77,9 @@ export function EditVersionInfoModal({ open, version, dosageForms, categories, s
 
       <div className="grid gap-4 sm:grid-cols-2">
         <Input label="Số phiên bản *" value={form.version} onChange={(e) => set('version', e.target.value)} placeholder="VD: 2.2" />
-        <Input label="Ngày hiệu lực *" type="date" value={form.effectiveDate} onChange={(e) => set('effectiveDate', e.target.value)} />
         <Input label="Số đăng ký" value={version.registrationNo || '—'} disabled icon={<Lock className="size-4" />} className="cursor-not-allowed bg-slate-50 text-muted" />
-        <Input label="Hạn dùng" value={form.shelfLife} onChange={(e) => set('shelfLife', e.target.value)} placeholder="VD: 36 tháng" />
+        <Input label="Ngày bắt đầu hiệu lực *" type="date" value={form.effectiveDate} onChange={(e) => set('effectiveDate', e.target.value)} />
+        <Input label="Ngày kết thúc hiệu lực *" type="date" value={form.endDate} onChange={(e) => set('endDate', e.target.value)} />
         <Select
           label="Dạng bào chế"
           options={dosageForms.map((d) => ({ value: d.id, label: d.name }))}
@@ -88,8 +92,11 @@ export function EditVersionInfoModal({ open, version, dosageForms, categories, s
           value={form.categoryId}
           onChange={(e) => set('categoryId', Number(e.target.value))}
         />
+        <Input label="Hạn dùng" value={form.shelfLife} onChange={(e) => set('shelfLife', e.target.value)} placeholder="VD: 36 tháng" />
         <Input label="Quy cách đóng gói" value={form.packaging} onChange={(e) => set('packaging', e.target.value)} />
-        <Input label="Quy định" value={form.regulation} onChange={(e) => set('regulation', e.target.value)} />
+        <div className="sm:col-span-2">
+          <Input label="Quy định" value={form.regulation} onChange={(e) => set('regulation', e.target.value)} />
+        </div>
         <div className="sm:col-span-2">
           <Textarea label="Hoạt chất & hàm lượng *" rows={2} value={form.activeIngredients} onChange={(e) => set('activeIngredients', e.target.value)} />
         </div>

@@ -2,6 +2,7 @@ import { createBrowserRouter, Navigate } from 'react-router-dom'
 import { AppLayout } from '@/core/layout/AppLayout'
 import ProductsPage from '@/features/products/ui/ProductsPage'
 import ProductDetailPage from '@/features/product-detail/ui/ProductDetailPage'
+import VersionDraftPage from '@/features/product-detail/ui/VersionDraftPage'
 import VersionWorkspacePage from '@/features/product-detail/ui/VersionWorkspacePage'
 import DosageFormsPage from '@/features/dosage-forms/ui/DosageFormsPage'
 import CategoriesPage from '@/features/categories/ui/CategoriesPage'
@@ -18,6 +19,7 @@ export const router = createBrowserRouter([
       { index: true, element: <Navigate to="/products" replace /> },
       { path: 'products', element: <ProductsPage /> },
       { path: 'products/:id', element: <ProductDetailPage /> },
+      { path: 'products/:id/versions/new', element: <VersionDraftPage /> },
       { path: 'products/:id/versions/:versionId', element: <VersionWorkspacePage /> },
       { path: 'dosage-forms', element: <DosageFormsPage /> },
       { path: 'categories', element: <CategoriesPage /> },

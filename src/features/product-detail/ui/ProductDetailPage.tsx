@@ -10,10 +10,9 @@ import { useProducts } from '@/features/products/logic/useProducts'
 import { useLookups } from '@/features/products/logic/useLookups'
 import { downloadSingleDocument, downloadVersionDossier } from '../logic/downloadDossier'
 import { buildDocuments, docsByGroup } from '../logic/documents'
-import { buildNewVersionInput } from '../logic/newVersionDefaults'
 import type { ProductVersion, VersionDocument } from '../logic/types'
-import { useActivateVersion, useCreateVersion, useProductVersions } from '../logic/useProductVersions'
-import { getCurrentVersion, isVersionDue, previousVersionOf, sortVersions, suggestNextVersionAfter } from '../logic/versionUtils'
+import { useActivateVersion, useProductVersions } from '../logic/useProductVersions'
+import { getCurrentVersion, isVersionDue, previousVersionOf, sortVersions } from '../logic/versionUtils'
 import { DetailHero } from './DetailHero'
 import { DocumentViewerModal } from './DocumentViewerModal'
 import { GeneralInfoCard } from './GeneralInfoCard'
@@ -33,7 +32,6 @@ export default function ProductDetailPage() {
   const { data: products = [], isLoading: loadingProducts } = useProducts()
   const { data: versions = [], isLoading: loadingVersions } = useProductVersions(Number.isFinite(productId) ? productId : 0)
   const lookups = useLookups()
-  const createVersion = useCreateVersion(productId)
   const activateVersion = useActivateVersion(productId)
 
   const [selectedId, setSelectedId] = useState<number | null>(null)
@@ -90,15 +88,7 @@ export default function ProductDetailPage() {
   }
 
   const handleCreateVersion = () => {
-    const base = current ?? selected
-    if (!base) return
-    createVersion.mutate(buildNewVersionInput(base, suggestNextVersionAfter(sorted)), {
-      onSuccess: (created) => {
-        toast.success(`Đã tạo phiên bản ${created.version} · Chờ duyệt`)
-        navigate(`/products/${productId}/versions/${created.id}`)
-      },
-      onError: showError,
-    })
+    navigate(`/products/${productId}/versions/new`)
   }
 
   const requestActivate = (version: ProductVersion) => {
@@ -148,7 +138,6 @@ export default function ProductDetailPage() {
         categoryName={categoryName}
         docsCount={docs.length}
         downloading={downloading}
-        creating={createVersion.isPending}
         onSelect={setSelectedId}
         onCreate={handleCreateVersion}
         onDownload={() => handleDownloadVersion(selected, docs, previous)}
@@ -173,7 +162,6 @@ export default function ProductDetailPage() {
             selectedId={selected.id}
             onPreview={(v) => setPreviewId(v.id)}
             onCreate={handleCreateVersion}
-            creating={createVersion.isPending}
           />
         </aside>
 

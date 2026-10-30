@@ -1,9 +1,10 @@
 import type { LucideIcon } from 'lucide-react'
-import { CalendarClock, CalendarCheck2, ClipboardList, Factory, Hash, Layers, Package, Pencil, Pill, ShieldCheck, Workflow } from 'lucide-react'
+import { CalendarClock, CalendarCheck2, CalendarX2, ClipboardList, Factory, Hash, Layers, Package, Pencil, Pill, ShieldCheck, Workflow } from 'lucide-react'
 import { Badge } from '@/core/components/Badge'
 import { Button } from '@/core/components/Button'
 import { formatDate } from '@/core/utils/format'
 import { STAGE_META, type ProductVersion } from '../logic/types'
+import { versionEndDate } from '../logic/versionUtils'
 
 interface Props {
   version: ProductVersion
@@ -21,7 +22,8 @@ export function GeneralInfoCard({ version, dosageName, categoryName, stageLabel,
     { icon: Pill, label: 'Dạng bào chế', value: dosageName },
     { icon: Layers, label: 'Phân loại', value: categoryName },
     { icon: CalendarClock, label: 'Hạn dùng', value: version.shelfLife || '—' },
-    { icon: CalendarCheck2, label: 'Ngày hiệu lực', value: formatDate(version.effectiveDate) },
+    { icon: CalendarCheck2, label: 'Ngày bắt đầu hiệu lực', value: formatDate(version.effectiveDate) },
+    { icon: CalendarX2, label: 'Ngày kết thúc hiệu lực', value: formatDate(versionEndDate(version)) || '—' },
     { icon: ShieldCheck, label: 'Quy định', value: version.regulation },
     { icon: Package, label: 'Quy cách đóng gói', value: version.packaging || '—' },
     { icon: Factory, label: 'Nơi sản xuất', value: version.manufacturer, wide: true },

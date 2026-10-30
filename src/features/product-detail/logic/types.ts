@@ -17,6 +17,8 @@ export interface ProductVersion {
   basedOnVersion?: string
   stage: VersionStage
   effectiveDate: string
+  /** Ngày kết thúc hiệu lực của phiên bản (nếu chưa có sẽ suy ra 24 tháng từ ngày bắt đầu). */
+  effectiveEndDate?: string
   updatedAt: string
   summary: string
   changes: VersionChange[]
@@ -59,12 +61,8 @@ export interface VersionDocument {
   fileName?: string
 }
 
-/** Ảnh chụp thực tế của quy cách đóng gói (lưu data URL ở FE mock). */
-export interface PackagingPhoto {
-  url: string
-  fileName: string
-  updatedAt: string
-}
+/** Ảnh chụp thực tế lưu trên cloud; database chỉ giữ ID/tham chiếu. */
+export type PackagingPhoto = import('@/core/media/cloudMedia').MediaRef
 
 /** Một quy cách đóng gói – mỗi quy cách có STT, hồ sơ kỹ thuật và ảnh chụp. */
 export interface PackagingSpec {
@@ -78,16 +76,26 @@ export interface PackagingSpec {
 export interface CreateVersionInput {
   version: string
   effectiveDate: string
+  endDate: string
   activeIngredients: string
+  dosageFormId: number
+  categoryId: number
   packaging: string
   shelfLife: string
+  regulation: string
+  manufacturer: string
+  manufacturingMethod: string
   summary: string
   customChanges: VersionChange[]
+  /** Dữ liệu đã chuẩn bị trên trang nháp. */
+  extraDocs?: VersionDocument[]
+  packagingSpecs?: PackagingSpec[]
 }
 
 export interface UpdateVersionInfoInput {
   version: string
   effectiveDate: string
+  endDate: string
   activeIngredients: string
   dosageFormId: number
   categoryId: number

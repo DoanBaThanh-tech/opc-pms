@@ -8,6 +8,7 @@ import { Pagination } from '@/core/components/Pagination'
 import { useToast } from '@/core/components/Toast'
 import type { ApiError } from '@/core/types/common'
 import { exportProducts } from '../logic/exportProducts'
+import { suggestNextProductCode } from '../logic/productCode'
 import type { Product } from '../logic/types'
 import { useProductFilters } from '../logic/useProductFilters'
 import { useLookups } from '../logic/useLookups'
@@ -28,6 +29,7 @@ export default function ProductsPage() {
   const [formOpen, setFormOpen] = useState(false)
   const [editing, setEditing] = useState<Product | null>(null)
   const [exporting, setExporting] = useState(false)
+  const nextCode = useMemo(() => suggestNextProductCode(products), [products])
 
   const openForm = (p: Product | null) => { setEditing(p); setFormOpen(true) }
 
@@ -74,7 +76,7 @@ export default function ProductsPage() {
       <ProductFilters filters={f.filters} onChange={f.setFilter} onReset={f.reset} hasFilter={f.hasFilter} dosageForms={lookups.dosageForms} categories={lookups.categories} />
       <DataTable data={f.pageItems} columns={columns} rowKey={(p) => p.id} loading={isLoading} emptyText="Không có sản phẩm nào khớp bộ lọc" onRowClick={(p) => navigate(`/products/${p.id}`)} />
       <Pagination page={f.page} totalPages={f.totalPages} total={f.filtered.length} pageSize={f.pageSize} onChange={f.setPage} />
-      <ProductFormModal open={formOpen} product={editing} dosageForms={lookups.dosageForms} categories={lookups.categories} onClose={() => setFormOpen(false)} />
+      <ProductFormModal open={formOpen} product={editing} nextCode={nextCode} dosageForms={lookups.dosageForms} categories={lookups.categories} onClose={() => setFormOpen(false)} />
     </>
   )
 }

@@ -6,9 +6,10 @@ import { Badge } from '@/core/components/Badge'
 import { Button } from '@/core/components/Button'
 import { Modal } from '@/core/components/Modal'
 import { useToast } from '@/core/components/Toast'
+import { uploadImage } from '@/core/media/cloudMedia'
+import { MediaImage } from '@/core/media/MediaImage'
 import type { ApiError } from '@/core/types/common'
 import { formatDate } from '@/core/utils/format'
-import { fileToCompressedDataUrl } from '@/core/utils/image'
 import type { Product } from '@/features/products/logic/types'
 import { formatSize } from '../../logic/documents'
 import { resolvePackagingSpecs } from '../../logic/packagingSpecs'
@@ -22,11 +23,13 @@ interface Props {
   version: ProductVersion
   onView: (doc: VersionDocument) => void
   onDownload: (doc: VersionDocument) => void
+  /** Dùng ở trang nháp: lưu quy cách vào state thay vì gọi API. */
+  onSaveSpecs?: (specs: PackagingSpec[]) => Promise<void> | void
 }
 
 const nowIso = () => new Date().toISOString()
 
-export function PackagingFrame({ product, version, onView, onDownload }: Props) {
+export function PackagingFrame({ product, version, onView, onDownload, onSaveSpecs }: Props) {
   const toast = useToast()
   const save = useSavePackagingSpecs(product.id)
   const specs = resolvePackagingSpecs(product, version)
@@ -37,17 +40,30 @@ export function PackagingFrame({ product, version, onView, onDownload }: Props) 
   const fileRef = useRef<HTMLInputElement>(null)
   const pendingSpec = useRef<string | null>(null)
 
-  const commit = (
+  const commit = async (
     next: PackagingSpec[],
     message: string,
     opts?: { onSuccess?: () => void; onError?: () => void },
-  ) => save.mutate({ versionId: version.id, specs: next }, {
-    onSuccess: () => { toast.success(message); opts?.onSuccess?.() },
-    onError: (e) => { toast.error((e as unknown as ApiError).message); opts?.onError?.() },
-  })
+  ) => {
+    if (onSaveSpecs) {
+      try {
+        await onSaveSpecs(next)
+        toast.success(message)
+        opts?.onSuccess?.()
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : 'Không lưu được quy cách.')
+        opts?.onError?.()
+      }
+      return
+    }
+    save.mutate({ versionId: version.id, specs: next }, {
+      onSuccess: () => { toast.success(message); opts?.onSuccess?.() },
+      onError: (e) => { toast.error((e as unknown as ApiError).message); opts?.onError?.() },
+    })
+  }
 
   const addSpec = (spec: PackagingSpec) =>
-    commit([...specs, spec], `Đã thêm quy cách "${spec.name}"`, { onSuccess: () => setAddOpen(false) })
+    void commit([...specs, spec], `Đã thêm quy cách "${spec.name}"`, { onSuccess: () => setAddOpen(false) })
 
   const pickPhoto = (specId: string) => {
     pendingSpec.current = specId
@@ -59,10 +75,10 @@ export function PackagingFrame({ product, version, onView, onDownload }: Props) 
     if (!file || !specId) return
     setUploadingId(specId)
     try {
-      const url = await fileToCompressedDataUrl(file)
-      const photo: PackagingPhoto = { url, fileName: file.name, updatedAt: nowIso() }
+      const media = await uploadImage(file)
+      const photo: PackagingPhoto = { ...media, fileName: file.name, updatedAt: media.updatedAt || nowIso() }
       const next = specs.map((s) => (s.id === specId ? { ...s, photo } : s))
-      commit(next, 'Đã cập nhật ảnh chụp thực tế', { onSuccess: () => setUploadingId(null), onError: () => setUploadingId(null) })
+      await commit(next, 'Đã cập nhật ảnh chụp thực tế', { onSuccess: () => setUploadingId(null), onError: () => setUploadingId(null) })
     } catch (e) {
       setUploadingId(null)
       toast.error(e instanceof Error ? e.message : 'Không đọc được ảnh.')
@@ -71,7 +87,7 @@ export function PackagingFrame({ product, version, onView, onDownload }: Props) 
 
   const removePhoto = (spec: PackagingSpec) => {
     const next = specs.map((s) => (s.id === spec.id ? { ...s, photo: undefined } : s))
-    commit(next, `Đã xóa ảnh chụp của "${spec.name}"`)
+    void commit(next, `Đã xóa ảnh chụp của "${spec.name}"`)
   }
 
   return (
@@ -135,8 +151,8 @@ export function PackagingFrame({ product, version, onView, onDownload }: Props) 
       >
         {preview && (
           <>
-            <img src={preview.url} alt={preview.fileName} className="max-h-[68dvh] w-full rounded-xl bg-brand-50 object-contain" />
-            <p className="mt-2 text-xs text-muted">Cập nhật {formatDate(preview.updatedAt)}</p>
+            <MediaImage media={preview} alt={preview.fileName} className="max-h-[68dvh] w-full rounded-xl bg-brand-50 object-contain" />
+            <p className="mt-2 text-xs text-muted">Cập nhật {formatDate(preview.updatedAt)} · Lưu cloud: <span className="font-mono">{preview.id}</span></p>
           </>
         )}
       </Modal>
@@ -215,7 +231,7 @@ function SpecCard({ spec, index, editable, uploading, onView, onDownload, onPick
 
           {spec.photo ? (
             <button onClick={onPreviewPhoto} className="group relative mt-2 block w-full overflow-hidden rounded-lg border border-line bg-brand-50">
-              <img src={spec.photo.url} alt={spec.photo.fileName} loading="lazy" className="h-32 w-full object-cover transition duration-500 group-hover:scale-105" />
+              <MediaImage media={spec.photo} alt={spec.photo.fileName} className="h-32 w-full object-cover transition duration-500 group-hover:scale-105" />
               <span className="absolute inset-0 flex items-center justify-center gap-1.5 bg-brand-900/45 text-xs font-bold text-white opacity-0 transition group-hover:opacity-100">
                 <Eye className="size-4" /> Xem ảnh
               </span>

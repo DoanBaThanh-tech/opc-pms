@@ -1,5 +1,7 @@
 import type { Product } from '@/features/products/logic/types'
+import { getMediaBlob } from '@/core/media/cloudMedia'
 import { downloadBlob, downloadHtml, fileSlug } from '@/core/utils/download'
+import { blobToDataUrl } from '@/core/utils/image'
 import { buildDossierHtml } from './dossierHtml'
 import { buildDocumentHtml } from './documentHtml'
 import { docsByGroup } from './documents'
@@ -42,8 +44,32 @@ export async function downloadVersionDossier(args: DossierArgs) {
   const JSZip = (await import('jszip')).default
   const zip = new JSZip()
   const root = zip.folder(`OPC_ho-so_${args.product.code}_v${args.version.version}`)!
+  const specs = resolvePackagingSpecs(args.product, args.version)
 
-  root.file('00-tong-quan.html', buildDossierHtml(ctx))
+  // Ảnh chỉ lưu ID trong DB; khi xuất hồ sơ mới tải nội dung từ cloud về nhúng vào HTML/ZIP.
+  const photoSrc: Record<string, string> = {}
+  const photoFiles: { name: string; base64: string }[] = []
+  for (let i = 0; i < specs.length; i++) {
+    const photo = specs[i].photo
+    if (!photo) continue
+    let dataUrl = photo.url?.startsWith('data:image/') ? photo.url : ''
+    if (!dataUrl) {
+      const blob = await getMediaBlob(photo)
+      if (blob) dataUrl = await blobToDataUrl(blob)
+    }
+    if (dataUrl) {
+      if (photo.id) photoSrc[photo.id] = dataUrl
+      const match = dataUrl.match(/^data:image\/(png|jpe?g|webp|gif);base64,(.+)$/i)
+      if (match) {
+        const ext = match[1].toLowerCase().replace('jpeg', 'jpg')
+        photoFiles.push({ name: `${String(i + 1).padStart(2, '0')}-${fileSlug(specs[i].name)}.${ext}`, base64: match[2] })
+      }
+    } else if (photo.url && photo.id) {
+      photoSrc[photo.id] = photo.url
+    }
+  }
+
+  root.file('00-tong-quan.html', buildDossierHtml(ctx, photoSrc))
   root.file('du-lieu-day-du.json', JSON.stringify({
     exportedAt: new Date().toISOString(),
     product: args.product,
@@ -69,13 +95,10 @@ export async function downloadVersionDossier(args: DossierArgs) {
     })
   }
 
-  const photoFolder = root.folder('03-quy-cach-ky-thuat/anh-chup')!
-  resolvePackagingSpecs(args.product, args.version).forEach((spec, i) => {
-    const match = spec.photo?.url.match(/^data:image\/(png|jpe?g|webp|gif);base64,(.+)$/i)
-    if (!match) return
-    const ext = match[1].toLowerCase().replace('jpeg', 'jpg')
-    photoFolder.file(`${String(i + 1).padStart(2, '0')}-${fileSlug(spec.name)}.${ext}`, match[2], { base64: true })
-  })
+  if (photoFiles.length) {
+    const photoFolder = root.folder('03-quy-cach-ky-thuat/anh-chup')!
+    photoFiles.forEach((file) => photoFolder.file(file.name, file.base64, { base64: true }))
+  }
 
   const blob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 6 } })
   downloadBlob(`${baseName(args.product, args.version)}_ho-so-day-du.zip`, blob)

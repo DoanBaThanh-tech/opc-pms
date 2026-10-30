@@ -4,6 +4,7 @@ import {
   badge, changeTable, docStatusLabel, escapeHtml, footer, htmlStyles, infoGrid, letterhead, stageLabel,
   type HtmlContext,
 } from './htmlShared'
+import { versionEndDate } from './versionUtils'
 
 const stageTone = { current: 'blue', coming_soon: 'amber', archived: 'gray' } as const
 
@@ -20,7 +21,8 @@ function legalBody(ctx: HtmlContext, doc: VersionDocument) {
         ['Quy định', v.regulation],
         ['Quy cách đóng gói', v.packaging],
         ['Hạn dùng', v.shelfLife],
-        ['Ngày hiệu lực', formatDate(v.effectiveDate)],
+        ['Ngày bắt đầu hiệu lực', formatDate(v.effectiveDate)],
+        ['Ngày kết thúc hiệu lực', formatDate(versionEndDate(v)) || '—'],
         ['Người phê duyệt', v.approvedBy],
       ])}
       <div class="callout"><b>Điều 1.</b> Phê duyệt phiên bản ${escapeHtml(v.version)} với hoạt chất và hàm lượng: ${escapeHtml(v.activeIngredients)}.<br /><b>Điều 2.</b> Các bộ phận liên quan triển khai in ấn nhãn, tờ hướng dẫn và cập nhật hồ sơ kỹ thuật theo đúng nội dung được duyệt.</div>
@@ -38,7 +40,8 @@ function legalBody(ctx: HtmlContext, doc: VersionDocument) {
         ['Quy cách đóng gói', v.packaging],
         ['Hạn dùng', v.shelfLife],
         ['Cơ sở sản xuất', v.manufacturer],
-        ['Ngày hiệu lực', formatDate(v.effectiveDate)],
+        ['Ngày bắt đầu hiệu lực', formatDate(v.effectiveDate)],
+        ['Ngày kết thúc hiệu lực', formatDate(versionEndDate(v)) || '—'],
       ])}
       <h2>Phạm vi áp dụng</h2>
       <p>Sản phẩm được phép sản xuất, lưu thông và sử dụng theo đúng hồ sơ đã công bố. Mọi thay đổi về thành phần, quy cách hoặc nhãn mác phải được cập nhật thành phiên bản mới trong hệ thống OPC PMS trước khi triển khai.</p>`

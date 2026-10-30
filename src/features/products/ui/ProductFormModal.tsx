@@ -18,6 +18,7 @@ import { useSaveProduct } from '../logic/useProducts'
 interface Props {
   open: boolean
   product: Product | null
+  nextCode: string
   dosageForms: CatalogItem[]
   categories: CatalogItem[]
   onClose: () => void
@@ -28,7 +29,7 @@ const empty: ProductFormValues = {
   regulation: '', shelfLife: '', packaging: '', registrationNo: '',
 }
 
-export function ProductFormModal({ open, product, dosageForms, categories, onClose }: Props) {
+export function ProductFormModal({ open, product, nextCode, dosageForms, categories, onClose }: Props) {
   const toast = useToast()
   const save = useSaveProduct()
   const { register, handleSubmit, reset, formState: { errors } } = useForm<ProductFormValues>({
@@ -42,8 +43,8 @@ export function ProductFormModal({ open, product, dosageForms, categories, onClo
       dosageFormId: String(product.dosageFormId), categoryId: String(product.categoryId),
       activeIngredients: product.activeIngredients, regulation: product.regulation,
       shelfLife: product.shelfLife, packaging: product.packaging, registrationNo: product.registrationNo,
-    } : empty)
-  }, [open, product, reset])
+    } : { ...empty, code: nextCode })
+  }, [open, product, nextCode, reset])
 
   const onSubmit = (v: ProductFormValues) =>
     save.mutate(
@@ -71,7 +72,11 @@ export function ProductFormModal({ open, product, dosageForms, categories, onClo
         </p>
       )}
       <form id="product-form" onSubmit={handleSubmit(onSubmit)} className="grid gap-4 sm:grid-cols-2">
-        <Input label="Mã sản phẩm *" placeholder="VD: SP012" error={errors.code?.message} {...register('code')} />
+        {product ? (
+          <Input label="Mã sản phẩm" readOnly aria-readonly className="cursor-not-allowed bg-brand-50/70 text-muted" {...register('code')} />
+        ) : (
+          <input type="hidden" {...register('code')} />
+        )}
         <div>
           <Input
             label={product ? 'Phiên bản' : 'Phiên bản *'}

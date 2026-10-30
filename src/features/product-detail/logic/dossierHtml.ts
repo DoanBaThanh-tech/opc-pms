@@ -2,10 +2,11 @@ import { formatDate } from '@/core/utils/format'
 import { badge, changeTable, docTable, escapeHtml, footer, htmlStyles, infoGrid, letterhead, stageLabel, type HtmlContext } from './htmlShared'
 import { docsByGroup } from './documents'
 import { resolvePackagingSpecs } from './packagingSpecs'
+import { versionEndDate } from './versionUtils'
 
 const stageTone = { current: 'blue', coming_soon: 'amber', archived: 'gray' } as const
 
-export function buildDossierHtml(ctx: HtmlContext) {
+export function buildDossierHtml(ctx: HtmlContext, photoSrc: Record<string, string> = {}) {
   const { product: p, version: v, docs, versions, names } = ctx
   const legal = docsByGroup(docs, 'legal')
   const usage = docsByGroup(docs, 'usage').filter((d) => !d.shared)
@@ -48,7 +49,7 @@ export function buildDossierHtml(ctx: HtmlContext) {
       <div class="cover-band">
         <p style="margin:0;font-size:11px;letter-spacing:.16em;text-transform:uppercase;opacity:.8">Phiên bản đang xem</p>
         <b>Phiên bản ${escapeHtml(v.version)} · ${escapeHtml(stageLabel(v.stage))}</b>
-        <p style="margin:6px 0 0;font-size:12.5px;opacity:.9">Hiệu lực ${formatDate(v.effectiveDate)} · Cập nhật ${formatDate(v.updatedAt)} · ${escapeHtml(v.approvalNo)}</p>
+        <p style="margin:6px 0 0;font-size:12.5px;opacity:.9">Hiệu lực ${formatDate(v.effectiveDate)} – ${formatDate(versionEndDate(v)) || '—'} · Cập nhật ${formatDate(v.updatedAt)} · ${escapeHtml(v.approvalNo)}</p>
       </div>
       <div class="cover-meta">
         <div><span>Mã sản phẩm</span><b>${escapeHtml(p.code)}</b></div>
@@ -90,7 +91,8 @@ export function buildDossierHtml(ctx: HtmlContext) {
       ['Quy cách đóng gói', v.packaging || '—'],
       ['Hạn dùng', v.shelfLife || '—'],
       ['Nơi sản xuất', v.manufacturer],
-      ['Ngày hiệu lực', formatDate(v.effectiveDate)],
+      ['Ngày bắt đầu hiệu lực', formatDate(v.effectiveDate)],
+      ['Ngày kết thúc hiệu lực', formatDate(versionEndDate(v)) || '—'],
     ])}
     <h2>Cách thức sản xuất</h2>
     <p>${escapeHtml(v.manufacturingMethod)}</p>
@@ -132,8 +134,8 @@ export function buildDossierHtml(ctx: HtmlContext) {
         <p style="margin:0;font-size:12px"><b>Hồ sơ kỹ thuật:</b> ${escapeHtml(spec.technicalDoc.name)}</p>
         <p class="muted" style="margin:2px 0 0;font-size:11px">${escapeHtml(spec.technicalDoc.code)} · ${spec.technicalDoc.pages} trang · ${formatDate(spec.technicalDoc.updatedAt)}</p>
       </div>
-      <div>${spec.photo
-        ? `<img src="${escapeHtml(spec.photo.url)}" alt="${escapeHtml(spec.photo.fileName)}" style="width:100%;max-height:52mm;object-fit:contain;border:1px solid #dbe8f3;border-radius:8px;background:#f6fbff" />`
+      <div>${spec.photo && (photoSrc[spec.photo.id] || spec.photo.url)
+        ? `<img src="${escapeHtml(photoSrc[spec.photo.id] ?? spec.photo.url ?? '')}" alt="${escapeHtml(spec.photo.fileName)}" style="width:100%;max-height:52mm;object-fit:contain;border:1px solid #dbe8f3;border-radius:8px;background:#f6fbff" />`
         : '<div class="muted" style="border:1px dashed #dbe8f3;border-radius:8px;padding:16px;text-align:center;font-size:11px">Chưa có ảnh chụp thực tế</div>'}</div>
     </div>`).join('')}
     ${sharedTechnical.length ? `<h3>Hồ sơ kỹ thuật dùng chung</h3>${docTable(sharedTechnical)}` : ''}

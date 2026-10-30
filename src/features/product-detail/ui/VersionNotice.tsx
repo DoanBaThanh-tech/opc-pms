@@ -3,6 +3,7 @@ import { ArrowLeft, Eye, Lock, Rocket, Sparkles } from 'lucide-react'
 import { Button } from '@/core/components/Button'
 import { formatDate } from '@/core/utils/format'
 import type { ProductVersion } from '../logic/types'
+import { versionEndDate } from '../logic/versionUtils'
 
 interface Props {
   version: ProductVersion
@@ -37,7 +38,7 @@ export function VersionNotice({ version, current, onPreview, onActivate, onBackT
           </p>
           <p className={`mt-0.5 text-xs leading-relaxed ${coming ? 'text-brand-800/80' : 'text-amber-800/80'}`}>
             {coming
-              ? `Dự kiến hiệu lực ${formatDate(version.effectiveDate)}. Toàn bộ khung bên dưới đang hiển thị dữ liệu của bản xem trước.`
+              ? `Dự kiến hiệu lực ${formatDate(version.effectiveDate)} – ${formatDate(versionEndDate(version)) || '—'}. Toàn bộ khung bên dưới đang hiển thị dữ liệu của bản xem trước.`
               : 'Phiên bản cũ không thể áp dụng lại. Mọi tài liệu tải xuống sẽ thuộc đúng phiên bản đang xem.'}
           </p>
         </div>

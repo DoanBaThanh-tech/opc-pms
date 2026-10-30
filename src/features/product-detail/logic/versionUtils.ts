@@ -65,6 +65,19 @@ export function isVersionDue(version: ProductVersion, onDate = todayIso()) {
   return version.effectiveDate.slice(0, 10) <= onDate
 }
 
+/** Cộng thêm số tháng vào ngày dạng YYYY-MM-DD, giữ nguyên kiểu ngày. */
+export function addMonths(isoDate: string, months: number) {
+  const parts = isoDate.slice(0, 10).split('-').map(Number)
+  if (parts.length !== 3 || parts.some((n) => !Number.isFinite(n))) return ''
+  const date = new Date(parts[0], parts[1] - 1 + months, parts[2])
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+}
+
+/** Ngày kết thúc hiệu lực, tự suy ra 24 tháng nếu dữ liệu cũ chưa có. */
+export function versionEndDate(version: ProductVersion) {
+  return version.effectiveEndDate || addMonths(version.effectiveDate, 24)
+}
+
 /** Số kế tiếp dựa trên phiên bản cao nhất đã có (kể cả Coming soon). */
 export function suggestNextVersionAfter(versions: ProductVersion[]) {
   const latest = latestVersionOf(versions)

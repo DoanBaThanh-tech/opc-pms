@@ -6,6 +6,7 @@ import { Drawer } from '@/core/components/Drawer'
 import { cn, formatDate } from '@/core/utils/format'
 import { docsByGroup } from '../logic/documents'
 import { DOC_GROUP_META, STAGE_META, type ProductVersion, type VersionDocument } from '../logic/types'
+import { versionEndDate } from '../logic/versionUtils'
 
 interface Props {
   open: boolean
@@ -74,7 +75,8 @@ export function VersionPreviewDrawer({ open, version, previous, docs, onClose, o
 
           <div className="grid grid-cols-2 gap-2">
             {[
-              ['Ngày hiệu lực', formatDate(version.effectiveDate)],
+              ['Bắt đầu hiệu lực', formatDate(version.effectiveDate)],
+              ['Kết thúc hiệu lực', formatDate(versionEndDate(version)) || '—'],
               ['Cập nhật gần nhất', formatDate(version.updatedAt)],
               ['Quyết định', version.approvalNo],
               ['Số đăng ký', version.registrationNo || '—'],

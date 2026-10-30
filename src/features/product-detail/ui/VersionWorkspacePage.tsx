@@ -12,12 +12,11 @@ import { useProducts } from '@/features/products/logic/useProducts'
 import { ProductSearchBar } from '@/features/products/ui/ProductSearchBar'
 import { downloadSingleDocument, downloadVersionDossier } from '../logic/downloadDossier'
 import { buildDocuments, docsByGroup } from '../logic/documents'
-import { buildNewVersionInput } from '../logic/newVersionDefaults'
 import { STAGE_META, type ProductVersion, type UpdateVersionInfoInput, type VersionDocument } from '../logic/types'
 import {
-  useCreateVersion, useProductVersions, useSaveVersionDocs, useUpdateVersionInfo,
+  useProductVersions, useSaveVersionDocs, useUpdateVersionInfo,
 } from '../logic/useProductVersions'
-import { previousVersionOf, sortVersions, suggestNextVersionAfter } from '../logic/versionUtils'
+import { previousVersionOf, sortVersions, versionEndDate } from '../logic/versionUtils'
 import { DocumentViewerModal } from './DocumentViewerModal'
 import { EditVersionInfoModal } from './EditVersionInfoModal'
 import { GeneralInfoCard } from './GeneralInfoCard'
@@ -58,7 +57,6 @@ export default function VersionWorkspacePage() {
   const lookups = useLookups()
   const updateInfo = useUpdateVersionInfo(productId)
   const saveDocs = useSaveVersionDocs(productId)
-  const createVersion = useCreateVersion(productId)
 
   const [editOpen, setEditOpen] = useState(false)
   const [uploadTarget, setUploadTarget] = useState<UploadTarget | null>(null)
@@ -131,14 +129,7 @@ export default function VersionWorkspacePage() {
   }
 
   const createNext = () => {
-    if (!version) return
-    createVersion.mutate(buildNewVersionInput(version, suggestNextVersionAfter(sorted)), {
-      onSuccess: (created) => {
-        toast.success(`Đã tạo phiên bản ${created.version} · Chờ duyệt`)
-        navigate(`/products/${productId}/versions/${created.id}`)
-      },
-      onError: fail,
-    })
+    navigate(`/products/${productId}/versions/new`)
   }
 
   if (loadingProducts || (product && loadingVersions)) return <WorkspaceSkeleton />
@@ -206,7 +197,8 @@ export default function VersionWorkspacePage() {
             </div>
 
             <div className="mt-3 flex flex-wrap gap-1.5 text-[11px] text-brand-50">
-              <span className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 px-2.5 py-1 ring-1 ring-white/10"><CalendarCheck2 className="size-3 text-brand-200" /> Hiệu lực {formatDate(version.effectiveDate)}</span>
+              <span className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 px-2.5 py-1 ring-1 ring-white/10"><CalendarCheck2 className="size-3 text-brand-200" /> Bắt đầu {formatDate(version.effectiveDate)}</span>
+              <span className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 px-2.5 py-1 ring-1 ring-white/10"><CalendarCheck2 className="size-3 text-brand-200" /> Kết thúc {formatDate(versionEndDate(version)) || '—'}</span>
               <span className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 px-2.5 py-1 ring-1 ring-white/10"><Stamp className="size-3 text-brand-200" /> {version.approvalNo}</span>
               <span className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 px-2.5 py-1 ring-1 ring-white/10"><FileText className="size-3 text-brand-200" /> {docs.length} tài liệu</span>
             </div>
@@ -285,7 +277,6 @@ export default function VersionWorkspacePage() {
             previous={previous}
             docCount={docs.length}
             canCreate={!readOnly}
-            creating={createVersion.isPending}
             onCreateNext={createNext}
             onBack={() => navigate(`/products/${product.id}`)}
           />
@@ -336,12 +327,11 @@ interface SidePanelProps {
   previous?: ProductVersion
   docCount: number
   canCreate: boolean
-  creating: boolean
   onCreateNext: () => void
   onBack: () => void
 }
 
-function VersionSidePanel({ version, stageLabel, previous, docCount, canCreate, creating, onCreateNext, onBack }: SidePanelProps) {
+function VersionSidePanel({ version, stageLabel, previous, docCount, canCreate, onCreateNext, onBack }: SidePanelProps) {
   const stage = STAGE_META[version.stage]
   return (
     <section className="overflow-hidden rounded-3xl border border-line bg-white shadow-soft">
@@ -358,7 +348,8 @@ function VersionSidePanel({ version, stageLabel, previous, docCount, canCreate, 
 
       <div className="space-y-2.5 px-4 py-4">
         {[
-          ['Ngày hiệu lực', formatDate(version.effectiveDate)],
+          ['Ngày bắt đầu hiệu lực', formatDate(version.effectiveDate)],
+          ['Ngày kết thúc hiệu lực', formatDate(versionEndDate(version)) || '—'],
           ['Cập nhật gần nhất', formatDate(version.updatedAt)],
           ['Quyết định', version.approvalNo],
           ['Người phê duyệt', version.approvedBy],
@@ -381,8 +372,8 @@ function VersionSidePanel({ version, stageLabel, previous, docCount, canCreate, 
           <Button variant="secondary" size="sm" icon={<RotateCcw className="size-4" />} onClick={onBack} className="w-full">
             Về chi tiết sản phẩm
           </Button>
-          <Button variant="ghost" size="sm" icon={<ShieldCheck className="size-4" />} loading={creating} onClick={onCreateNext} className="w-full" disabled={!canCreate}>
-            Tạo phiên bản kế tiếp
+          <Button variant="ghost" size="sm" icon={<ShieldCheck className="size-4" />} onClick={onCreateNext} className="w-full" disabled={!canCreate}>
+            Tạo phiên bản mới
           </Button>
         </div>
         <p className="text-center text-[10px] text-muted">Bản đang cập nhật: v{version.version}</p>

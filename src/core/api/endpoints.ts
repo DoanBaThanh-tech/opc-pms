@@ -2,6 +2,7 @@
 export const endpoints = {
   products: '/products',
   pendingVersions: '/product-versions/pending-approval',
+  media: '/media',
   dosageForms: '/dosage-forms',
   categories: '/categories',
   approvals: '/approvals',

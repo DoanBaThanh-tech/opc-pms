@@ -3,7 +3,8 @@ import { ImagePlus, Loader2, PackagePlus, Trash2 } from 'lucide-react'
 import { Button } from '@/core/components/Button'
 import { Input } from '@/core/components/Input'
 import { Modal } from '@/core/components/Modal'
-import { fileToCompressedDataUrl } from '@/core/utils/image'
+import { uploadImage } from '@/core/media/cloudMedia'
+import { MediaImage } from '@/core/media/MediaImage'
 import type { Product } from '@/features/products/logic/types'
 import type { PackagingPhoto, PackagingSpec, ProductVersion } from '../logic/types'
 
@@ -35,8 +36,8 @@ export function AddPackagingSpecModal({ open, product, version, specCount, savin
     setError('')
     setPhotoBusy(true)
     try {
-      const url = await fileToCompressedDataUrl(file)
-      setPhoto({ url, fileName: file.name, updatedAt: nowIso() })
+      const media = await uploadImage(file)
+      setPhoto({ ...media, fileName: file.name, updatedAt: media.updatedAt || nowIso() })
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Không đọc được ảnh.')
     } finally {
@@ -112,9 +113,12 @@ export function AddPackagingSpecModal({ open, product, version, specCount, savin
           <p className="mb-2 text-xs font-bold uppercase tracking-wide text-muted">Ảnh chụp thực tế (tùy chọn)</p>
           {photo ? (
             <div className="relative overflow-hidden rounded-xl border border-line">
-              <img src={photo.url} alt={photo.fileName} className="h-40 w-full bg-brand-50 object-contain" />
+              <MediaImage media={photo} alt={photo.fileName} className="h-40 w-full bg-brand-50 object-contain" />
               <div className="flex items-center justify-between gap-2 border-t border-line bg-white px-3 py-2">
-                <span className="truncate text-[11px] text-muted">{photo.fileName}</span>
+                <span className="min-w-0">
+                  <span className="block truncate text-[11px] text-muted">{photo.fileName}</span>
+                  <span className="block truncate font-mono text-[10px] text-muted/80">Cloud ID: {photo.id}</span>
+                </span>
                 <button type="button" onClick={() => setPhoto(null)} className="inline-flex items-center gap-1 text-[11px] font-bold text-opc-red hover:underline">
                   <Trash2 className="size-3.5" /> Xóa ảnh
                 </button>
@@ -128,7 +132,7 @@ export function AddPackagingSpecModal({ open, product, version, specCount, savin
               className="flex h-32 w-full flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-brand-200 bg-brand-50/40 text-xs font-semibold text-brand-600 transition hover:border-brand-300 hover:bg-brand-50 disabled:opacity-60"
             >
               {photoBusy ? <Loader2 className="size-5 animate-spin" /> : <ImagePlus className="size-6" />}
-              {photoBusy ? 'Đang xử lý ảnh...' : 'Chọn ảnh chụp thực tế'}
+              {photoBusy ? 'Đang tải ảnh lên cloud...' : 'Chọn ảnh chụp thực tế'}
             </button>
           )}
           <input

@@ -11,6 +11,7 @@ import { useToast } from '@/core/components/Toast'
 import type { ApiError } from '@/core/types/common'
 import { cn, formatDate } from '@/core/utils/format'
 import { usePendingVersions } from '@/features/product-detail/logic/useProductVersions'
+import { versionEndDate } from '@/features/product-detail/logic/versionUtils'
 import type { Product } from '@/features/products/logic/types'
 import { useLookups } from '@/features/products/logic/useLookups'
 import { useChangeStatus, useProducts } from '@/features/products/logic/useProducts'
@@ -99,7 +100,7 @@ export default function ApprovalsPage() {
                     </div>
                     <p className="mt-2 line-clamp-2 flex-1 text-sm text-muted">{v.summary || v.activeIngredients}</p>
                     <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-line pt-3">
-                      <span className="text-xs text-muted">Hiệu lực {formatDate(v.effectiveDate)} · Cập nhật {formatDate(v.updatedAt)}</span>
+                      <span className="text-xs text-muted">Hiệu lực {formatDate(v.effectiveDate)} – {formatDate(versionEndDate(v)) || '—'} · Cập nhật {formatDate(v.updatedAt)}</span>
                       <Button size="sm" variant="secondary" icon={<ArrowRight className="size-4" />} onClick={() => navigate(`/products/${p.id}/versions/${v.id}`)}>
                         Xem hồ sơ
                       </Button>
