@@ -4,6 +4,8 @@ import { ArrowLeft, PackageSearch } from 'lucide-react'
 import { Button } from '@/core/components/Button'
 import { ConfirmDialog } from '@/core/components/ConfirmDialog'
 import { useToast } from '@/core/components/Toast'
+import { canEditPackaging } from '@/core/auth/roles'
+import { useCurrentRole } from '@/core/auth/roleStore'
 import type { ApiError } from '@/core/types/common'
 import { formatDate } from '@/core/utils/format'
 import { useProducts } from '@/features/products/logic/useProducts'
@@ -28,6 +30,7 @@ export default function ProductDetailPage() {
   const productId = Number(id)
   const toast = useToast()
   const navigate = useNavigate()
+  const role = useCurrentRole()
 
   const { data: products = [], isLoading: loadingProducts } = useProducts()
   const { data: versions = [], isLoading: loadingVersions } = useProductVersions(Number.isFinite(productId) ? productId : 0)
@@ -138,6 +141,7 @@ export default function ProductDetailPage() {
         categoryName={categoryName}
         docsCount={docs.length}
         downloading={downloading}
+        canCreate={role !== 'commercial'}
         onSelect={setSelectedId}
         onCreate={handleCreateVersion}
         onDownload={() => handleDownloadVersion(selected, docs, previous)}
@@ -160,6 +164,7 @@ export default function ProductDetailPage() {
           <LifecyclePanel
             versions={sorted}
             selectedId={selected.id}
+            canCreate={role !== 'commercial'}
             onPreview={(v) => setPreviewId(v.id)}
             onCreate={handleCreateVersion}
           />
@@ -168,7 +173,7 @@ export default function ProductDetailPage() {
         <div className="space-y-5 xl:col-start-1 xl:row-start-2">
           <LegalFrame version={selected} docs={docsByGroup(docs, 'legal')} onView={setViewerDoc} onDownload={handleDownloadDoc} />
           <UsageFrame version={selected} previous={previous} docs={docsByGroup(docs, 'usage').filter((d) => !d.shared)} onView={setViewerDoc} onDownload={handleDownloadDoc} />
-          <PackagingFrame product={product} version={selected} onView={setViewerDoc} onDownload={handleDownloadDoc} />
+          <PackagingFrame product={product} version={selected} canEdit={canEditPackaging(role)} onView={setViewerDoc} onDownload={handleDownloadDoc} />
         </div>
       </div>
 

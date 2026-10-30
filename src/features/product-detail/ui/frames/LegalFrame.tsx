@@ -2,6 +2,7 @@ import { CalendarCheck2, Plus, Stamp } from 'lucide-react'
 import { Badge } from '@/core/components/Badge'
 import { Button } from '@/core/components/Button'
 import { formatDate } from '@/core/utils/format'
+import { lifecycleLabelOf } from '../../logic/approvalUtils'
 import { STAGE_META, type ProductVersion, type VersionDocument } from '../../logic/types'
 import { Frame } from './Frame'
 import { DocumentList } from './DocumentList'
@@ -46,7 +47,7 @@ export function LegalFrame({ version, docs, stageLabel, onView, onDownload, onAd
               <p className="mt-1 text-[11px] text-muted">Hiệu lực từ {formatDate(version.effectiveDate)}</p>
             </div>
           </div>
-          <Badge tone={stage.tone}>{stageLabel ?? stage.label}</Badge>
+          <Badge tone={stage.tone}>{stageLabel ?? lifecycleLabelOf(version)}</Badge>
         </div>
       </div>
       <DocumentList docs={docs} onView={onView} onDownload={onDownload} />

@@ -23,17 +23,19 @@ interface Props {
   version: ProductVersion
   onView: (doc: VersionDocument) => void
   onDownload: (doc: VersionDocument) => void
+  /** Cho phép chỉnh sửa theo vai trò (mặc định true cho trang nháp). */
+  canEdit?: boolean
   /** Dùng ở trang nháp: lưu quy cách vào state thay vì gọi API. */
   onSaveSpecs?: (specs: PackagingSpec[]) => Promise<void> | void
 }
 
 const nowIso = () => new Date().toISOString()
 
-export function PackagingFrame({ product, version, onView, onDownload, onSaveSpecs }: Props) {
+export function PackagingFrame({ product, version, onView, onDownload, canEdit = true, onSaveSpecs }: Props) {
   const toast = useToast()
   const save = useSavePackagingSpecs(product.id)
   const specs = resolvePackagingSpecs(product, version)
-  const editable = version.stage !== 'archived'
+  const editable = version.stage !== 'archived' && canEdit
   const [addOpen, setAddOpen] = useState(false)
   const [preview, setPreview] = useState<PackagingPhoto | null>(null)
   const [uploadingId, setUploadingId] = useState<string | null>(null)

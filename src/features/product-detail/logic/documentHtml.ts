@@ -12,7 +12,7 @@ function legalBody(ctx: HtmlContext, doc: VersionDocument) {
   const v = ctx.version
   if (doc.name.startsWith('Quyết định')) {
     return `
-      <p class="lead">Căn cứ hồ sơ đăng ký lưu hành và đề nghị của Phòng Đảm bảo chất lượng, Hội đồng thẩm định xem xét và phê duyệt nội dung phiên bản <b>${escapeHtml(v.version)}</b> của sản phẩm <b>${escapeHtml(ctx.product.name)}</b>.</p>
+      <p class="lead">Căn cứ hồ sơ đăng ký lưu hành và đề nghị của Phòng Đảm bảo chất lượng, Tổ ĐK Thuốc xem xét và phê duyệt nội dung phiên bản <b>${escapeHtml(v.version)}</b> của sản phẩm <b>${escapeHtml(ctx.product.name)}</b>.</p>
       <h2>Nội dung phê duyệt</h2>
       ${infoGrid([
         ['Số đăng ký', v.registrationNo || '—'],
@@ -48,7 +48,7 @@ function legalBody(ctx: HtmlContext, doc: VersionDocument) {
   }
   if (doc.name.startsWith('Biên bản')) {
     return `
-      <p class="lead">Hôm nay, Hội đồng thẩm định đã họp xem xét hồ sơ thay đổi của phiên bản <b>${escapeHtml(v.version)}</b> – sản phẩm <b>${escapeHtml(ctx.product.name)}</b>.</p>
+      <p class="lead">Hôm nay, Tổ ĐK Thuốc đã họp xem xét hồ sơ thay đổi của phiên bản <b>${escapeHtml(v.version)}</b> – sản phẩm <b>${escapeHtml(ctx.product.name)}</b>.</p>
       <h2>Kết quả thẩm định</h2>
       <table>
         <thead><tr><th>Nội dung thẩm định</th><th>Kết quả</th><th>Ghi chú</th></tr></thead>

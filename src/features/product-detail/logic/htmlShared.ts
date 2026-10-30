@@ -14,7 +14,7 @@ export interface HtmlContext {
 export const escapeHtml = (value: unknown) =>
   String(value ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string))
 
-const STAGE_LABEL = { current: 'Hiện hành', coming_soon: 'Coming soon', archived: 'Lưu trữ' } as const
+const STAGE_LABEL = { current: 'Đang lưu hành', coming_soon: 'Đang chờ duyệt', archived: 'Lưu trữ' } as const
 const DOC_STATUS_LABEL = { valid: 'Còn hiệu lực', superseded: 'Đã thay thế', draft: 'Bản xem trước' } as const
 
 export const stageLabel = (s: ProductVersion['stage']) => STAGE_LABEL[s]

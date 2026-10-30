@@ -78,6 +78,11 @@ export function versionEndDate(version: ProductVersion) {
   return version.effectiveEndDate || addMonths(version.effectiveDate, 24)
 }
 
+/** Nhãn hiển thị ngày kết thúc, tôn trọng lựa chọn hiệu lực vô thời hạn. */
+export function versionEndLabel(version: ProductVersion) {
+  return version.indefinite ? 'Vô thời hạn' : versionEndDate(version)
+}
+
 /** Số kế tiếp dựa trên phiên bản cao nhất đã có (kể cả Coming soon). */
 export function suggestNextVersionAfter(versions: ProductVersion[]) {
   const latest = latestVersionOf(versions)

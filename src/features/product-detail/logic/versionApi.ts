@@ -1,6 +1,7 @@
 import { http } from '@/core/api/client'
 import { endpoints } from '@/core/api/endpoints'
 import { createMockCollection, mockError } from '@/core/api/mock'
+import { roleMeta, type RoleKey } from '@/core/auth/roles'
 import { env } from '@/core/config/env'
 import { formatDate } from '@/core/utils/format'
 import { logHistory } from '@/features/history/logic/historyApi'
@@ -8,6 +9,9 @@ import { productsDb } from '@/features/products/logic/productApi'
 import { clonePackagingSpecsForVersion } from './packagingSpecs'
 import { baselineVersionFor, seedVersions } from './seedVersions'
 import type { CreateVersionInput, PackagingSpec, ProductVersion, UpdateVersionInfoInput, VersionDocument } from './types'
+import {
+  approvalStatusOf, approverRoleOf, canRoleAct, canRoleResubmit, inferRoleScope,
+} from './approvalUtils'
 import { applyVersionInfo } from './versionUpdates'
 import { compareVersion, isVersionDue, sortVersions } from './versionUtils'
 
@@ -43,6 +47,44 @@ function docsStatusPatch(version: ProductVersion, status: 'valid' | 'superseded'
   }
 }
 
+/** Ký xác thực toàn bộ tài liệu sau khi hồ sơ hoàn tất phê duyệt. */
+function docsSignedPatch(version: ProductVersion) {
+  const signedAt = now()
+  return {
+    signedAt,
+    packagingSpecs: version.packagingSpecs?.map((spec) => ({
+      ...spec,
+      technicalDoc: { ...spec.technicalDoc, verified: true },
+    })),
+    extraDocs: version.extraDocs?.map((doc) => ({ ...doc, verified: true })),
+  }
+}
+
+/** Áp dụng phiên bản thành phiên bản đang lưu hành, chuyển bản cũ sang lưu trữ. */
+function applyActivation(productId: number, target: ProductVersion, activatedOn: string) {
+  versionsDb.snapshot()
+    .filter((v) => v.productId === productId && v.stage === 'current')
+    .forEach((v) => versionsDb.patch(v.id, {
+      stage: 'archived',
+      summary: `Phiên bản lưu trữ – đã được phiên bản ${target.version} thay thế từ ngày ${formatDate(activatedOn)}.`,
+      ...docsStatusPatch(v, 'superseded'),
+    }))
+
+  const activated = versionsDb.patch(target.id, {
+    stage: 'current',
+    approvalStatus: 'approved',
+    effectiveDate: activatedOn,
+    appliedAt: now(),
+    updatedAt: now(),
+    approvedBy: target.approvedBy || 'Tổ ĐK Thuốc – Công ty CP Dược phẩm OPC',
+    summary: `Phiên bản ${target.version} đã được đưa vào sử dụng từ ngày ${formatDate(activatedOn)}.`,
+    ...docsStatusPatch(target, 'valid'),
+  })
+  const updatedProduct = productsDb.patch(productId, { version: target.version, updatedAt: now() })
+  logHistory(updatedProduct, 'updated', `Áp dụng phiên bản ${target.version} vào sử dụng`)
+  return activated
+}
+
 /** Mô phỏng API phiên bản sản phẩm. BE C# sẽ thay thế cùng contract. */
 export const versionApi = {
   list: async (productId: number): Promise<ProductVersion[]> => {
@@ -58,8 +100,8 @@ export const versionApi = {
     return [created]
   },
 
-  /** Phiên bản mới tạo đang chờ duyệt (Coming soon), mới nhất lên đầu. */
-  listPendingApprovals: async (): Promise<ProductVersion[]> => {
+  /** Hàng đợi xử lý phiên bản: gồm chờ xử lý, chờ duyệt, đã duyệt và bị từ chối. */
+  listApprovalVersions: async (): Promise<ProductVersion[]> => {
     if (!env.useMock) return http.get<ProductVersion[]>(endpoints.pendingVersions)
     const all = await versionsDb.all()
     return all
@@ -100,6 +142,8 @@ export const versionApi = {
     const nextVersion = input.version.trim()
     const createdAt = now()
     const compact = compactVersion(nextVersion)
+    const allChanges = [...autoChanges, ...input.customChanges]
+    const roleScope = inferRoleScope(allChanges, (input.extraDocs ?? []).map((doc) => doc.group))
     const sourceSpecs = input.packagingSpecs?.length
       ? input.packagingSpecs
       : clonePackagingSpecsForVersion(product, base, nextVersion, 'coming_soon', createdAt, input.packaging.trim())
@@ -111,6 +155,7 @@ export const versionApi = {
         id: `spec-${product.id}-${compact}-${i + 1}-doc`,
         code: `HSKT-${product.code}-${compact}-${String(i + 1).padStart(2, '0')}`,
         status: 'draft',
+        verified: false,
         updatedAt: createdAt,
       },
     }))
@@ -120,11 +165,26 @@ export const versionApi = {
       version: nextVersion,
       basedOnVersion: base.version,
       stage: 'coming_soon',
+      approvalStatus: 'processing',
+      assignedRole: roleScope.primary,
+      collaboratorRoles: roleScope.collaborators,
+      assignedAt: createdAt,
+      approverRole: 'ra',
       effectiveDate: input.effectiveDate,
       effectiveEndDate: input.endDate,
+      indefinite: input.indefinite ?? false,
       updatedAt: createdAt,
       summary: input.summary.trim(),
-      changes: [...autoChanges, ...input.customChanges],
+      changeNote: input.summary.trim(),
+      signedAt: undefined,
+      appliedAt: undefined,
+      processedByRole: undefined,
+      processedAt: undefined,
+      approvedByRole: undefined,
+      rejectedByRole: undefined,
+      rejectedReason: undefined,
+      rejectedAt: undefined,
+      changes: allChanges,
       activeIngredients: input.activeIngredients.trim(),
       dosageFormId: input.dosageFormId,
       categoryId: input.categoryId,
@@ -134,11 +194,11 @@ export const versionApi = {
       manufacturer: input.manufacturer.trim(),
       manufacturingMethod: input.manufacturingMethod.trim(),
       approvalNo: `QĐ-${product.code}-${nextVersion}`,
-      approvedBy: 'Hội đồng thẩm định OPC (dự kiến)',
+      approvedBy: `Hồ sơ mới – chờ ${roleMeta(roleScope.primary).name} xử lý`,
       packagingSpecs,
-      extraDocs: (input.extraDocs ?? []).map((doc) => ({ ...doc, status: 'draft' })),
+      extraDocs: (input.extraDocs ?? []).map((doc) => ({ ...doc, status: 'draft', verified: false })),
     })
-    logHistory({ ...product, version: created.version }, 'updated', `Tạo phiên bản ${created.version} (đang chờ áp dụng)`)
+    logHistory({ ...product, version: created.version }, 'updated', `Tạo phiên bản ${created.version} – gửi ${roleMeta(roleScope.primary).name} xử lý`)
     return created
   },
 
@@ -197,34 +257,147 @@ export const versionApi = {
     return versionsDb.patch(versionId, { extraDocs: docs })
   },
 
-  activate: async (productId: number, versionId: number): Promise<ProductVersion> => {
-    if (!env.useMock) return http.put<ProductVersion>(`${endpoints.products}/${productId}/versions/${versionId}/activate`, {})
+  /**
+   * Duyệt hồ sơ theo vai trò hiện tại:
+   * - processing → tổ phụ trách duyệt, hồ sơ chuyển sang pending (Chờ duyệt).
+   * - pending → Tổ ĐK Thuốc phê duyệt cuối, hồ sơ chuyển approved và ký xác thực.
+   */
+  approve: async (productId: number, versionId: number, role: RoleKey): Promise<ProductVersion> => {
+    if (!env.useMock) {
+      return http.put<ProductVersion>(`${endpoints.products}/${productId}/versions/${versionId}/approve`, { role })
+    }
+    const product = requireProduct(productId)
     const target = versionsDb.snapshot().find((v) => v.id === versionId && v.productId === productId)
     if (!target) throw mockError('Không tìm thấy phiên bản.', 404)
-    if (target.stage !== 'coming_soon') throw mockError('Chỉ phiên bản Coming soon mới có thể đưa vào sử dụng.', 409)
+    if (target.stage !== 'coming_soon') throw mockError('Chỉ phiên bản đang chờ mới có thể phê duyệt.', 409)
+    if (!canRoleAct(target, role)) {
+      throw mockError(`${roleMeta(role).name} không phụ trách bước xử lý hiện tại của hồ sơ này.`, 403)
+    }
+
+    const status = approvalStatusOf(target)
+    const at = now()
+
+    if (status === 'processing') {
+      const updated = versionsDb.patch(versionId, {
+        approvalStatus: 'pending',
+        processedByRole: role,
+        processedAt: at,
+        updatedAt: at,
+        approvedBy: `Đã xử lý – chờ ${roleMeta(approverRoleOf(target)).name} phê duyệt`,
+      })
+      logHistory({ ...product, version: target.version }, 'updated', `${roleMeta(role).name} duyệt phiên bản ${target.version}`)
+      return updated
+    }
+
+    const updated = versionsDb.patch(versionId, {
+      approvalStatus: 'approved',
+      approvedByRole: role,
+      approvedBy: `${roleMeta(role).name} – Công ty CP Dược phẩm OPC`,
+      updatedAt: at,
+      ...docsSignedPatch(target),
+    })
+    logHistory({ ...product, version: target.version }, 'updated', `${roleMeta(role).name} phê duyệt cuối phiên bản ${target.version}`)
+    return updated
+  },
+
+  /** Từ chối hồ sơ kèm lý do; chỉ vai trò đang phụ trách bước hiện tại mới thực hiện được. */
+  reject: async (productId: number, versionId: number, reason: string, role: RoleKey): Promise<ProductVersion> => {
+    if (!env.useMock) {
+      return http.put<ProductVersion>(`${endpoints.products}/${productId}/versions/${versionId}/reject`, { reason, role })
+    }
+    const product = requireProduct(productId)
+    const target = versionsDb.snapshot().find((v) => v.id === versionId && v.productId === productId)
+    if (!target) throw mockError('Không tìm thấy phiên bản.', 404)
+    if (target.stage !== 'coming_soon') throw mockError('Chỉ phiên bản đang chờ duyệt mới có thể từ chối.', 409)
+    if (!canRoleAct(target, role)) {
+      throw mockError(`${roleMeta(role).name} không phụ trách bước xử lý hiện tại của hồ sơ này.`, 403)
+    }
+    const note = reason.trim()
+    if (!note) throw mockError('Vui lòng nhập lý do từ chối.', 400)
+
+    const at = now()
+    const updated = versionsDb.patch(versionId, {
+      approvalStatus: 'rejected',
+      rejectedByRole: role,
+      rejectedReason: note,
+      rejectedAt: at,
+      updatedAt: at,
+      approvedBy: `${roleMeta(role).name} từ chối hồ sơ`,
+    })
+    logHistory({ ...product, version: target.version }, 'updated', `${roleMeta(role).name} từ chối phiên bản ${target.version}: ${note}`)
+    return updated
+  },
+
+  /** Cập nhật xong hồ sơ bị từ chối và gửi lại tổ phụ trách xử lý. */
+  resubmit: async (productId: number, versionId: number, role: RoleKey): Promise<ProductVersion> => {
+    if (!env.useMock) {
+      return http.put<ProductVersion>(`${endpoints.products}/${productId}/versions/${versionId}/resubmit`, { role })
+    }
+    const product = requireProduct(productId)
+    const target = versionsDb.snapshot().find((v) => v.id === versionId && v.productId === productId)
+    if (!target) throw mockError('Không tìm thấy phiên bản.', 404)
+    if (!canRoleResubmit(target, role)) {
+      throw mockError('Hồ sơ chưa bị từ chối hoặc vai trò hiện tại không được gửi lại.', 409)
+    }
+
+    const assignedRole = target.assignedRole
+      ?? inferRoleScope(target.changes, target.extraDocs?.map((doc) => doc.group)).primary
+    const at = now()
+    const updated = versionsDb.patch(versionId, {
+      approvalStatus: 'processing',
+      assignedRole,
+      assignedAt: at,
+      processedByRole: undefined,
+      processedAt: undefined,
+      approvedByRole: undefined,
+      rejectedByRole: undefined,
+      rejectedReason: undefined,
+      rejectedAt: undefined,
+      updatedAt: at,
+      approvedBy: `Hồ sơ gửi lại – chờ ${roleMeta(assignedRole).name} xử lý`,
+    })
+    logHistory({ ...product, version: target.version }, 'updated', `Gửi lại phiên bản ${target.version} tới ${roleMeta(assignedRole).name}`)
+    return updated
+  },
+
+  /** Bật/tắt hiệu lực vô thời hạn cho phiên bản. */
+  setIndefinite: async (productId: number, versionId: number, indefinite: boolean): Promise<ProductVersion> => {
+    if (!env.useMock) {
+      return http.put<ProductVersion>(`${endpoints.products}/${productId}/versions/${versionId}/indefinite`, { indefinite })
+    }
+    const target = versionsDb.snapshot().find((v) => v.id === versionId && v.productId === productId)
+    if (!target) throw mockError('Không tìm thấy phiên bản.', 404)
+    if (target.stage === 'archived') throw mockError('Phiên bản lưu trữ chỉ được xem.', 409)
+    return versionsDb.patch(versionId, { indefinite, updatedAt: now() })
+  },
+
+  /** Áp dụng ngay: Tổ ĐK Thuốc đưa phiên bản đã duyệt vào lưu hành với ngày hiệu lực hôm nay. */
+  applyNow: async (productId: number, versionId: number, role: RoleKey): Promise<ProductVersion> => {
+    if (!env.useMock) {
+      return http.put<ProductVersion>(`${endpoints.products}/${productId}/versions/${versionId}/apply-now`, { role })
+    }
+    if (role !== 'ra') throw mockError('Chỉ Tổ ĐK Thuốc được áp dụng phiên bản vào lưu hành.', 403)
+    const target = versionsDb.snapshot().find((v) => v.id === versionId && v.productId === productId)
+    if (!target) throw mockError('Không tìm thấy phiên bản.', 404)
+    if (target.stage !== 'coming_soon') throw mockError('Phiên bản không ở trạng thái chờ áp dụng.', 409)
+    if (approvalStatusOf(target) !== 'approved') {
+      throw mockError('Phiên bản cần hoàn tất phê duyệt trước khi áp dụng.', 409)
+    }
+    return applyActivation(productId, target, today())
+  },
+
+  activate: async (productId: number, versionId: number, role: RoleKey): Promise<ProductVersion> => {
+    if (!env.useMock) return http.put<ProductVersion>(`${endpoints.products}/${productId}/versions/${versionId}/activate`, { role })
+    if (role !== 'ra') throw mockError('Chỉ Tổ ĐK Thuốc được đưa phiên bản vào lưu hành.', 403)
+    const target = versionsDb.snapshot().find((v) => v.id === versionId && v.productId === productId)
+    if (!target) throw mockError('Không tìm thấy phiên bản.', 404)
+    if (target.stage !== 'coming_soon') throw mockError('Chỉ phiên bản đang chờ mới có thể đưa vào sử dụng.', 409)
+    if (approvalStatusOf(target) !== 'approved') {
+      throw mockError('Phiên bản chưa hoàn tất phê duyệt.', 409)
+    }
     if (!isVersionDue(target)) {
       throw mockError(`Chưa tới ngày áp dụng (${formatDate(target.effectiveDate)}). Chưa thể đưa phiên bản vào sử dụng.`, 409)
     }
-
-    const activatedOn = today()
-    versionsDb.snapshot()
-      .filter((v) => v.productId === productId && v.stage === 'current')
-      .forEach((v) => versionsDb.patch(v.id, {
-        stage: 'archived',
-        summary: `Phiên bản lưu trữ – đã được phiên bản ${target.version} thay thế từ ngày ${formatDate(activatedOn)}.`,
-        ...docsStatusPatch(v, 'superseded'),
-      }))
-
-    const activated = versionsDb.patch(versionId, {
-      stage: 'current',
-      effectiveDate: activatedOn,
-      updatedAt: now(),
-      approvedBy: 'Hội đồng thẩm định – Công ty CP Dược phẩm OPC',
-      summary: `Phiên bản ${target.version} đã được đưa vào sử dụng từ ngày ${formatDate(activatedOn)}.`,
-      ...docsStatusPatch(target, 'valid'),
-    })
-    const updatedProduct = productsDb.patch(productId, { version: target.version, updatedAt: now() })
-    logHistory(updatedProduct, 'updated', `Áp dụng phiên bản ${target.version} vào sử dụng`)
-    return activated
+    return applyActivation(productId, target, today())
   },
 }

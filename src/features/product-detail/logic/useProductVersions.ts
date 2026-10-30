@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useCurrentRole } from '@/core/auth/roleStore'
 import { versionApi } from './versionApi'
 import type { CreateVersionInput, PackagingSpec, UpdateVersionInfoInput, VersionDocument } from './types'
 
@@ -13,12 +14,17 @@ export function useProductVersions(productId: number) {
   })
 }
 
-/** Các phiên bản mới tạo đang chờ duyệt trên toàn hệ thống. */
-export function usePendingVersions() {
+/** Các phiên bản đang trong hàng đợi xử lý (chờ xử lý, chờ duyệt, đã duyệt và từ chối). */
+export function useApprovalVersions() {
   return useQuery({
     queryKey: pendingKey,
-    queryFn: () => versionApi.listPendingApprovals(),
+    queryFn: () => versionApi.listApprovalVersions(),
   })
+}
+
+/** Giữ tên cũ để tương thích với các màn hình đang dùng. */
+export function usePendingVersions() {
+  return useApprovalVersions()
 }
 
 function useRefresh(productId: number) {
@@ -42,8 +48,55 @@ export function useCreateVersion(productId: number) {
 
 export function useActivateVersion(productId: number) {
   const refresh = useRefresh(productId)
+  const role = useCurrentRole()
   return useMutation({
-    mutationFn: (versionId: number) => versionApi.activate(productId, versionId),
+    mutationFn: (versionId: number) => versionApi.activate(productId, versionId, role),
+    onSuccess: refresh,
+  })
+}
+
+export function useApproveVersion(productId: number) {
+  const refresh = useRefresh(productId)
+  const role = useCurrentRole()
+  return useMutation({
+    mutationFn: (versionId: number) => versionApi.approve(productId, versionId, role),
+    onSuccess: refresh,
+  })
+}
+
+export function useRejectVersion(productId: number) {
+  const refresh = useRefresh(productId)
+  const role = useCurrentRole()
+  return useMutation({
+    mutationFn: ({ versionId, reason }: { versionId: number; reason: string }) =>
+      versionApi.reject(productId, versionId, reason, role),
+    onSuccess: refresh,
+  })
+}
+
+export function useResubmitVersion(productId: number) {
+  const refresh = useRefresh(productId)
+  const role = useCurrentRole()
+  return useMutation({
+    mutationFn: (versionId: number) => versionApi.resubmit(productId, versionId, role),
+    onSuccess: refresh,
+  })
+}
+
+export function useSetVersionIndefinite(productId: number) {
+  const refresh = useRefresh(productId)
+  return useMutation({
+    mutationFn: ({ versionId, indefinite }: { versionId: number; indefinite: boolean }) =>
+      versionApi.setIndefinite(productId, versionId, indefinite),
+    onSuccess: refresh,
+  })
+}
+
+export function useApplyVersionNow(productId: number) {
+  const refresh = useRefresh(productId)
+  const role = useCurrentRole()
+  return useMutation({
+    mutationFn: (versionId: number) => versionApi.applyNow(productId, versionId, role),
     onSuccess: refresh,
   })
 }

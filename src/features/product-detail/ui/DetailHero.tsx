@@ -5,7 +5,8 @@ import { Button } from '@/core/components/Button'
 import { Select } from '@/core/components/Select'
 import type { Product, ProductStatus } from '@/features/products/logic/types'
 import { STATUS_META } from '@/features/products/logic/constants'
-import { STAGE_META, type ProductVersion } from '../logic/types'
+import { lifecycleLabelOf } from '../logic/approvalUtils'
+import type { ProductVersion } from '../logic/types'
 
 interface Props {
   product: Product
@@ -16,6 +17,7 @@ interface Props {
   docsCount: number
   downloading: boolean
   creating?: boolean
+  canCreate?: boolean
   onSelect: (versionId: number) => void
   onCreate: () => void
   onDownload: () => void
@@ -29,14 +31,14 @@ const STATUS_DOT: Record<ProductStatus, string> = {
   discontinued: 'bg-slate-400',
 }
 
-export function DetailHero({ product, version, versions, dosageName, categoryName, docsCount, downloading, creating, onSelect, onCreate, onDownload }: Props) {
+export function DetailHero({ product, version, versions, dosageName, categoryName, docsCount, downloading, creating, canCreate = true, onSelect, onCreate, onDownload }: Props) {
   const [pendingId, setPendingId] = useState(String(version.id))
 
   const apply = () => {
     const id = Number(pendingId)
     if (id && id !== version.id) onSelect(id)
   }
-  const options = versions.map((v) => ({ value: v.id, label: `v${v.version} · ${STAGE_META[v.stage].label}` }))
+  const options = versions.map((v) => ({ value: v.id, label: `v${v.version} · ${lifecycleLabelOf(v)}` }))
   const statusMeta = STATUS_META[product.status]
 
   return (
@@ -84,7 +86,7 @@ export function DetailHero({ product, version, versions, dosageName, categoryNam
 
         <div className="w-full shrink-0 space-y-3 lg:w-[21.5rem]">
           <div className="flex flex-col gap-2 sm:flex-row">
-            <Button variant="light" icon={<Plus className="size-4" />} loading={creating} onClick={onCreate} className="flex-[1.35] whitespace-nowrap">Tạo phiên bản mới</Button>
+            <Button variant="light" icon={<Plus className="size-4" />} loading={creating} onClick={onCreate} disabled={!canCreate} title={canCreate ? 'Tạo phiên bản mới' : 'Tổ Kinh doanh chỉ được xem và tải tài liệu'} className="flex-[1.35] whitespace-nowrap">Tạo phiên bản mới</Button>
             <Button variant="glass" icon={<Download className="size-4" />} loading={downloading} onClick={onDownload} className="flex-1 whitespace-nowrap">Tải hồ sơ</Button>
           </div>
 

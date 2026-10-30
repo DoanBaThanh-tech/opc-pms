@@ -24,6 +24,7 @@ export function EditVersionInfoModal({ open, version, dosageForms, categories, s
     version: version.version,
     effectiveDate: version.effectiveDate.slice(0, 10),
     endDate: versionEndDate(version).slice(0, 10),
+    indefinite: !!version.indefinite,
     activeIngredients: version.activeIngredients,
     dosageFormId: version.dosageFormId,
     categoryId: version.categoryId,
@@ -42,8 +43,8 @@ export function EditVersionInfoModal({ open, version, dosageForms, categories, s
   const submit = () => {
     if (!/^\d+(\.\d+){0,3}$/.test(form.version.trim())) { setError('Số phiên bản hợp lệ: 2.2 hoặc 2.2.1'); return }
     if (!form.effectiveDate) { setError('Chọn ngày bắt đầu hiệu lực.'); return }
-    if (!form.endDate) { setError('Chọn ngày kết thúc hiệu lực.'); return }
-    if (form.endDate < form.effectiveDate) { setError('Ngày kết thúc hiệu lực phải sau hoặc bằng ngày bắt đầu.'); return }
+    if (!form.indefinite && !form.endDate) { setError('Chọn ngày kết thúc hiệu lực hoặc tích "Hiệu lực vô thời hạn".'); return }
+    if (!form.indefinite && form.endDate < form.effectiveDate) { setError('Ngày kết thúc hiệu lực phải sau hoặc bằng ngày bắt đầu.'); return }
     if (!form.activeIngredients.trim()) { setError('Nhập hoạt chất & hàm lượng.'); return }
     if (!form.summary.trim()) { setError('Nhập tóm tắt nội dung phiên bản.'); return }
     onSubmit({
@@ -79,7 +80,21 @@ export function EditVersionInfoModal({ open, version, dosageForms, categories, s
         <Input label="Số phiên bản *" value={form.version} onChange={(e) => set('version', e.target.value)} placeholder="VD: 2.2" />
         <Input label="Số đăng ký" value={version.registrationNo || '—'} disabled icon={<Lock className="size-4" />} className="cursor-not-allowed bg-slate-50 text-muted" />
         <Input label="Ngày bắt đầu hiệu lực *" type="date" value={form.effectiveDate} onChange={(e) => set('effectiveDate', e.target.value)} />
-        <Input label="Ngày kết thúc hiệu lực *" type="date" value={form.endDate} onChange={(e) => set('endDate', e.target.value)} />
+        <Input label="Ngày kết thúc hiệu lực" type="date" value={form.endDate} disabled={form.indefinite} onChange={(e) => set('endDate', e.target.value)} className={form.indefinite ? 'cursor-not-allowed bg-slate-50 text-muted' : undefined} />
+        <label className="sm:col-span-2 flex cursor-pointer items-start gap-3 rounded-xl border border-brand-100 bg-brand-50/50 px-3.5 py-3">
+          <input
+            type="checkbox"
+            className="mt-0.5 size-4 accent-brand-600"
+            checked={!!form.indefinite}
+            onChange={(e) => set('indefinite', e.target.checked)}
+          />
+          <span>
+            <span className="block text-sm font-bold text-brand-900">Hiệu lực vô thời hạn</span>
+            <span className="mt-0.5 block text-[11px] leading-relaxed text-muted">
+              Phiên bản được sử dụng liên tục cho tới khi có phiên bản thay thế. Ngày kết thúc sẽ không giới hạn hiệu lực.
+            </span>
+          </span>
+        </label>
         <Select
           label="Dạng bào chế"
           options={dosageForms.map((d) => ({ value: d.id, label: d.name }))}

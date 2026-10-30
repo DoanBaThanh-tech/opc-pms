@@ -2,11 +2,13 @@ import { createBrowserRouter, Navigate } from 'react-router-dom'
 import { AppLayout } from '@/core/layout/AppLayout'
 import ProductsPage from '@/features/products/ui/ProductsPage'
 import ProductDetailPage from '@/features/product-detail/ui/ProductDetailPage'
+import VersionComparePage from '@/features/product-detail/ui/VersionComparePage'
 import VersionDraftPage from '@/features/product-detail/ui/VersionDraftPage'
 import VersionWorkspacePage from '@/features/product-detail/ui/VersionWorkspacePage'
 import DosageFormsPage from '@/features/dosage-forms/ui/DosageFormsPage'
 import CategoriesPage from '@/features/categories/ui/CategoriesPage'
 import ApprovalsPage from '@/features/approvals/ui/ApprovalsPage'
+import RolesPage from '@/features/roles/ui/RolesPage'
 import HistoryPage from '@/features/history/ui/HistoryPage'
 import ComparisonPage from '@/features/comparison/ui/ComparisonPage'
 import SettingsPage from '@/features/settings/ui/SettingsPage'
@@ -21,9 +23,11 @@ export const router = createBrowserRouter([
       { path: 'products/:id', element: <ProductDetailPage /> },
       { path: 'products/:id/versions/new', element: <VersionDraftPage /> },
       { path: 'products/:id/versions/:versionId', element: <VersionWorkspacePage /> },
+      { path: 'products/:id/compare/:oldId/:newId', element: <VersionComparePage /> },
       { path: 'dosage-forms', element: <DosageFormsPage /> },
       { path: 'categories', element: <CategoriesPage /> },
       { path: 'approvals', element: <ApprovalsPage /> },
+      { path: 'roles', element: <RolesPage /> },
       { path: 'history', element: <HistoryPage /> },
       { path: 'comparison', element: <ComparisonPage /> },
       { path: 'settings', element: <SettingsPage /> },

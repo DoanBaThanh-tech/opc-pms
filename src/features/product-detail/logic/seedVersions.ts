@@ -27,7 +27,7 @@ const SITES: Record<number, { manufacturer: string; manufacturingMethod: string 
   },
 }
 
-const APPROVER = 'Hội đồng thẩm định – Công ty CP Dược phẩm OPC'
+const APPROVER = 'Tổ ĐK Thuốc – Công ty CP Dược phẩm OPC'
 
 function baseOf(p: Product) {
   const site = SITES[p.categoryId] ?? SITES[1]
@@ -58,10 +58,15 @@ function versionOf(
     id,
     version: p.version,
     stage,
+    approvalStatus: stage === 'coming_soon' ? 'processing' : 'approved',
+    approverRole: 'ra',
     effectiveDate: p.updatedAt,
     effectiveEndDate: addMonths(p.updatedAt, 24),
+    indefinite: false,
+    signedAt: stage === 'coming_soon' ? undefined : p.updatedAt,
     updatedAt: p.updatedAt,
     summary: `Phiên bản ${p.version} đang được lưu hành với ${p.packaging || 'quy cách hiện hành'}. Hồ sơ pháp lý và hướng dẫn sử dụng đã được phê duyệt.`,
+    changeNote: stage === 'coming_soon' ? 'Hồ sơ mới được khởi tạo và đang chờ tổ phụ trách xử lý.' : '',
     changes,
     approvalNo: `QĐ-${p.code}-${p.version}`,
     ...overrides,
@@ -114,13 +119,16 @@ export const seedVersions: ProductVersion[] = [
     ], {
       version: '2.2',
       effectiveDate: '2026-11-15',
+      effectiveEndDate: '2028-11-15',
+      assignedRole: 'rnd',
+      collaboratorRoles: ['design'],
       updatedAt: '2026-10-24T09:15:00Z',
       activeIngredients: 'Tỳ bà diệp 1,8g; Cát cánh 0,5g; Bạch linh 0,5g (trong 5ml)',
       packaging: 'Chai 100ml',
       shelfLife: '30 tháng',
       summary: 'Tăng hàm lượng Tỳ bà diệp, đổi sang chai 100ml và cập nhật tờ hướng dẫn sử dụng mới.',
       approvalNo: 'QĐ-SP001-2.2',
-      approvedBy: 'Hội đồng thẩm định OPC (dự kiến)',
+      approvedBy: 'Tổ ĐK Thuốc – phê duyệt cuối',
     }),
   },
   current1,

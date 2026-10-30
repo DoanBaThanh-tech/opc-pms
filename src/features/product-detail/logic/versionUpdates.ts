@@ -7,7 +7,7 @@ export function applyVersionInfo(
   productCode: string,
   updatedAt = new Date().toISOString(),
 ): ProductVersion {
-  const { endDate, ...info } = input
+  const { endDate, indefinite, ...info } = input
   const nextVersion = info.version.trim()
   const compact = nextVersion.replace(/\./g, '')
   const status: DocStatus = version.stage === 'archived' ? 'superseded' : version.stage === 'current' ? 'valid' : 'draft'
@@ -27,6 +27,7 @@ export function applyVersionInfo(
     ...info,
     version: nextVersion,
     effectiveEndDate: endDate,
+    ...(indefinite === undefined ? {} : { indefinite }),
     approvalNo: `QĐ-${productCode}-${nextVersion}`,
     packagingSpecs,
     updatedAt,

@@ -157,7 +157,7 @@ export default function VersionDraftPage() {
     createVersion.mutate(toCreateVersionInput(activeDraft), {
       onSuccess: (created) => {
         setConfirmOpen(false)
-        toast.success(`Đã tạo phiên bản ${created.version} · Chờ duyệt`)
+        toast.success(`Đã tạo phiên bản ${created.version} · Đang chờ tổ phụ trách xử lý`)
         navigate(`/products/${productId}/versions/${created.id}`)
       },
       onError: (e) => {
@@ -398,7 +398,7 @@ export default function VersionDraftPage() {
       <ConfirmDialog
         open={confirmOpen}
         title="Tạo phiên bản mới"
-        message={`Bạn có chắc chắn muốn tạo phiên bản này không? Phiên bản ${activeDraft.version} sẽ được ghi vào hồ sơ và chuyển sang trạng thái Chờ duyệt.`}
+        message={`Bạn có chắc chắn muốn tạo phiên bản này không? Phiên bản ${activeDraft.version} sẽ được ghi vào hồ sơ và tự động gửi tới tổ phụ trách nội dung thay đổi để xử lý.`}
         confirmText="Tạo phiên bản"
         confirmVariant="primary"
         loading={createVersion.isPending}

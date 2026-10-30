@@ -3,10 +3,13 @@ import { ArrowRight, Boxes, BookOpenCheck, CheckCircle2, Download, FileText, Loc
 import { Badge } from '@/core/components/Badge'
 import { Button } from '@/core/components/Button'
 import { Drawer } from '@/core/components/Drawer'
+import { canApplyVersion } from '@/core/auth/roles'
+import { useCurrentRole } from '@/core/auth/roleStore'
 import { cn, formatDate } from '@/core/utils/format'
 import { docsByGroup } from '../logic/documents'
+import { approvalStatusOf, lifecycleLabelOf } from '../logic/approvalUtils'
 import { DOC_GROUP_META, STAGE_META, type ProductVersion, type VersionDocument } from '../logic/types'
-import { versionEndDate } from '../logic/versionUtils'
+import { versionEndLabel } from '../logic/versionUtils'
 
 interface Props {
   open: boolean
@@ -40,6 +43,7 @@ const GROUPS = [
 ]
 
 export function VersionPreviewDrawer({ open, version, previous, docs, onClose, onDownload, downloading, onActivate }: Props) {
+  const role = useCurrentRole()
   const stage = version ? STAGE_META[version.stage] : STAGE_META.current
   const Icon = version ? STAGE_ICON[version.stage] : CheckCircle2
 
@@ -49,13 +53,13 @@ export function VersionPreviewDrawer({ open, version, previous, docs, onClose, o
       onClose={onClose}
       eyebrow="Chi tiết phiên bản"
       title={version ? `Phiên bản ${version.version}` : 'Phiên bản'}
-      description={version ? `${stage.label} · Cập nhật ${formatDate(version.updatedAt)}` : undefined}
+      description={version ? `${lifecycleLabelOf(version)} · Cập nhật ${formatDate(version.updatedAt)}` : undefined}
       footer={version && (
         <>
           <Button variant="secondary" icon={<Download className="size-4" />} loading={downloading} onClick={onDownload}>
             Tải hồ sơ phiên bản
           </Button>
-          {version.stage === 'coming_soon' && (
+          {version.stage === 'coming_soon' && approvalStatusOf(version) === 'approved' && canApplyVersion(role) && (
             <Button icon={<Rocket className="size-4" />} onClick={onActivate}>Đưa vào sử dụng</Button>
           )}
         </>
@@ -68,7 +72,7 @@ export function VersionPreviewDrawer({ open, version, previous, docs, onClose, o
               <Icon className="size-4" />
             </span>
             <div>
-              <p className="text-sm font-bold">{stage.label}</p>
+              <p className="text-sm font-bold">{lifecycleLabelOf(version)}</p>
               <p className="mt-0.5 text-xs leading-relaxed opacity-80">{version.summary || stage.description}</p>
             </div>
           </div>
@@ -76,7 +80,7 @@ export function VersionPreviewDrawer({ open, version, previous, docs, onClose, o
           <div className="grid grid-cols-2 gap-2">
             {[
               ['Bắt đầu hiệu lực', formatDate(version.effectiveDate)],
-              ['Kết thúc hiệu lực', formatDate(versionEndDate(version)) || '—'],
+              ['Kết thúc hiệu lực', version.indefinite ? 'Vô thời hạn' : formatDate(versionEndLabel(version)) || '—'],
               ['Cập nhật gần nhất', formatDate(version.updatedAt)],
               ['Quyết định', version.approvalNo],
               ['Số đăng ký', version.registrationNo || '—'],

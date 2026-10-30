@@ -3,7 +3,8 @@ import { CalendarClock, CalendarCheck2, CalendarX2, ClipboardList, Factory, Hash
 import { Badge } from '@/core/components/Badge'
 import { Button } from '@/core/components/Button'
 import { formatDate } from '@/core/utils/format'
-import { STAGE_META, type ProductVersion } from '../logic/types'
+import type { ProductVersion } from '../logic/types'
+import { lifecycleLabelOf, lifecycleToneOf } from '../logic/approvalUtils'
 import { versionEndDate } from '../logic/versionUtils'
 
 interface Props {
@@ -23,13 +24,14 @@ export function GeneralInfoCard({ version, dosageName, categoryName, stageLabel,
     { icon: Layers, label: 'Phân loại', value: categoryName },
     { icon: CalendarClock, label: 'Hạn dùng', value: version.shelfLife || '—' },
     { icon: CalendarCheck2, label: 'Ngày bắt đầu hiệu lực', value: formatDate(version.effectiveDate) },
-    { icon: CalendarX2, label: 'Ngày kết thúc hiệu lực', value: formatDate(versionEndDate(version)) || '—' },
+    { icon: CalendarX2, label: 'Ngày kết thúc hiệu lực', value: version.indefinite ? 'Vô thời hạn' : formatDate(versionEndDate(version)) || '—' },
     { icon: ShieldCheck, label: 'Quy định', value: version.regulation },
     { icon: Package, label: 'Quy cách đóng gói', value: version.packaging || '—' },
     { icon: Factory, label: 'Nơi sản xuất', value: version.manufacturer, wide: true },
     { icon: Workflow, label: 'Cách thức sản xuất', value: version.manufacturingMethod, wide: true },
   ]
-  const stage = STAGE_META[version.stage]
+  const statusLabel = stageLabel ?? lifecycleLabelOf(version)
+  const statusTone = lifecycleToneOf(version)
 
   return (
     <section className="overflow-hidden rounded-3xl border border-line bg-white shadow-soft">
@@ -41,7 +43,7 @@ export function GeneralInfoCard({ version, dosageName, categoryName, stageLabel,
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="text-base font-extrabold tracking-tight text-brand-900 sm:text-lg">Thông tin chung</h2>
             <Badge tone="blue">v{version.version}</Badge>
-            <Badge tone={stage.tone}>{stageLabel ?? stage.label}</Badge>
+            <Badge tone={statusTone}>{statusLabel}</Badge>
           </div>
           <p className="mt-0.5 text-xs text-muted sm:text-sm">Ảnh chụp dữ liệu hồ sơ theo phiên bản đang xem.</p>
         </div>

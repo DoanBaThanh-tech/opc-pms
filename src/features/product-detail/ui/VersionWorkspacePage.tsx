@@ -1,49 +1,44 @@
 import { useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import {
-  ArrowLeft, CalendarCheck2, ClipboardCheck, Download, FileText, PackageSearch, RotateCcw, ShieldCheck, Stamp,
+  ArrowLeft, CalendarCheck2, CalendarX2, Check, ClipboardCheck, Download, FileText, GitCompare,
+  PackageSearch, RotateCcw, ShieldCheck, UsersRound, X,
 } from 'lucide-react'
 import { Button } from '@/core/components/Button'
+import { ConfirmDialog } from '@/core/components/ConfirmDialog'
 import { useToast } from '@/core/components/Toast'
 import type { ApiError } from '@/core/types/common'
 import { formatDate } from '@/core/utils/format'
 import { useLookups } from '@/features/products/logic/useLookups'
 import { useProducts } from '@/features/products/logic/useProducts'
 import { ProductSearchBar } from '@/features/products/ui/ProductSearchBar'
-import { downloadSingleDocument, downloadVersionDossier } from '../logic/downloadDossier'
-import { buildDocuments, docsByGroup } from '../logic/documents'
-import { STAGE_META, type ProductVersion, type UpdateVersionInfoInput, type VersionDocument } from '../logic/types'
 import {
-  useProductVersions, useSaveVersionDocs, useUpdateVersionInfo,
+  approvalMetaOf, approvalStatusOf, approverRoleOf, assignedRoleOf, canRoleAct, canRoleResubmit,
+  lifecycleLabelOf, lifecycleToneOf, roleTaskLabel,
+} from '../logic/approvalUtils'
+import {
+  canApplyVersion, canEditGeneralInfo, roleMeta, type RoleKey,
+} from '@/core/auth/roles'
+import { useCurrentRole } from '@/core/auth/roleStore'
+import { downloadSingleDocument, downloadVersionDossier } from '../logic/downloadDossier'
+import { buildDocuments } from '../logic/documents'
+import type { ProductVersion, UpdateVersionInfoInput, VersionDocument } from '../logic/types'
+import {
+  useApplyVersionNow, useApproveVersion, useProductVersions, useRejectVersion, useResubmitVersion,
+  useSetVersionIndefinite, useUpdateVersionInfo,
 } from '../logic/useProductVersions'
 import { previousVersionOf, sortVersions, versionEndDate } from '../logic/versionUtils'
+import { ChangeNoteFrame } from './ChangeNoteFrame'
+import { ChangeSummaryFrame } from './ChangeSummaryFrame'
+import { CompareVersionModal } from './CompareVersionModal'
 import { DocumentViewerModal } from './DocumentViewerModal'
 import { EditVersionInfoModal } from './EditVersionInfoModal'
+import { EffectiveValidityFrame } from './EffectiveValidityFrame'
 import { GeneralInfoCard } from './GeneralInfoCard'
-import { UploadDocumentModal, type UploadTarget } from './UploadDocumentModal'
-import { LegalFrame } from './frames/LegalFrame'
-import { PackagingFrame } from './frames/PackagingFrame'
-import { SharedDocsFrame } from './frames/SharedDocsFrame'
-import { UsageFrame } from './frames/UsageFrame'
-
-const LEGAL_TARGET: UploadTarget = {
-  group: 'legal',
-  title: 'Thêm hồ sơ pháp lý/quyết định phê duyệt',
-  description: 'Tài liệu pháp lý được gắn vào phiên bản đang cập nhật và xuất hiện trong hồ sơ pháp lý của phiên bản.',
-}
-
-const PROFESSIONAL_TARGET: UploadTarget = {
-  group: 'professional',
-  title: 'Tải lên hồ sơ chuyên môn',
-  description: 'Hồ sơ chuyên môn dùng chung cho phiên bản: công thức, quy trình, tiêu chuẩn hoặc tài liệu tham chiếu.',
-}
-
-const SHARED_USAGE_TARGET: UploadTarget = {
-  group: 'usage',
-  shared: true,
-  title: 'Tải lên HDSD dùng chung',
-  description: 'Tờ hướng dẫn sử dụng dùng chung, không gắn với từng quy cách đóng gói cụ thể.',
-}
+import { LifecyclePanel } from './LifecyclePanel'
+import { RejectVersionModal } from './RejectVersionModal'
+import { SignedDocsFrame } from './SignedDocsFrame'
+import { VersionDatesModal } from './VersionDatesModal'
 
 export default function VersionWorkspacePage() {
   const { id, versionId } = useParams()
@@ -51,15 +46,23 @@ export default function VersionWorkspacePage() {
   const numericVersionId = Number(versionId)
   const navigate = useNavigate()
   const toast = useToast()
+  const role = useCurrentRole()
 
   const { data: products = [], isLoading: loadingProducts } = useProducts()
   const { data: versions = [], isLoading: loadingVersions } = useProductVersions(productId)
   const lookups = useLookups()
   const updateInfo = useUpdateVersionInfo(productId)
-  const saveDocs = useSaveVersionDocs(productId)
+  const approveVersion = useApproveVersion(productId)
+  const rejectVersion = useRejectVersion(productId)
+  const resubmitVersion = useResubmitVersion(productId)
+  const setIndefinite = useSetVersionIndefinite(productId)
+  const applyNow = useApplyVersionNow(productId)
 
   const [editOpen, setEditOpen] = useState(false)
-  const [uploadTarget, setUploadTarget] = useState<UploadTarget | null>(null)
+  const [datesOpen, setDatesOpen] = useState(false)
+  const [rejectOpen, setRejectOpen] = useState(false)
+  const [compareOpen, setCompareOpen] = useState(false)
+  const [applyOpen, setApplyOpen] = useState(false)
   const [viewerDoc, setViewerDoc] = useState<VersionDocument | null>(null)
   const [downloading, setDownloading] = useState(false)
 
@@ -74,34 +77,84 @@ export default function VersionWorkspacePage() {
 
   const dosageName = lookups.dosageName(version?.dosageFormId ?? 0)
   const categoryName = lookups.categoryName(version?.categoryId ?? 0)
+  const previousDosageName = lookups.dosageName(previous?.dosageFormId ?? 0)
+  const previousCategoryName = lookups.categoryName(previous?.categoryId ?? 0)
   const names = { dosage: dosageName, category: categoryName }
-  const readOnly = version?.stage === 'archived'
-  const stageLabel = version ? (version.stage === 'coming_soon' ? 'Chờ duyệt' : STAGE_META[version.stage].label) : ''
+  const status = version ? approvalStatusOf(version) : null
+  const stageLabel = version ? lifecycleLabelOf(version) : ''
+  const stageTone = version ? lifecycleToneOf(version) : 'blue'
+  const assignedRole = version ? assignedRoleOf(version) : 'ra'
+  const approverRole = version ? approverRoleOf(version) : 'ra'
+  const canAct = version ? canRoleAct(version, role) : false
+  const canResend = version ? canRoleResubmit(version, role) : false
+  const canEditInfo = !!version && (version.stage === 'current' || status === 'rejected') && canEditGeneralInfo(role)
+  const canEditDates = !!version && version.stage !== 'archived' && role === 'ra'
+    && (version.stage === 'current' || status === 'approved' || status === 'rejected')
+  const canApply = !!version && canApplyVersion(role)
+  const endLabel = version?.indefinite ? 'Vô thời hạn' : formatDate(version ? versionEndDate(version) : '') || '—'
 
   const fail = (e: unknown) => toast.error((e as unknown as ApiError).message)
-
-  const openUpload = (target: UploadTarget) => setUploadTarget(target)
 
   const submitInfo = (input: UpdateVersionInfoInput) => {
     if (!version) return
     updateInfo.mutate({ versionId: version.id, input }, {
       onSuccess: (updated) => {
         setEditOpen(false)
+        setDatesOpen(false)
         toast.success(`Đã cập nhật thông tin phiên bản ${updated.version}`)
       },
       onError: fail,
     })
   }
 
-  const submitDoc = (doc: VersionDocument) => {
+  const handleApprove = () => {
     if (!version) return
-    const next = [...(version.extraDocs ?? []), doc]
-    saveDocs.mutate({ versionId: version.id, docs: next }, {
+    approveVersion.mutate(version.id, {
+      onSuccess: () => toast.success(status === 'processing'
+        ? `Đã duyệt phiên bản ${version.version}, chuyển sang Chờ duyệt`
+        : `Đã phê duyệt cuối phiên bản ${version.version}`),
+      onError: fail,
+    })
+  }
+
+  const handleReject = (reason: string) => {
+    if (!version) return
+    rejectVersion.mutate({ versionId: version.id, reason }, {
       onSuccess: () => {
-        setUploadTarget(null)
-        toast.success(`Đã tải lên "${doc.name}"`)
+        setRejectOpen(false)
+        toast.info(`Đã từ chối phiên bản ${version.version}`)
       },
       onError: fail,
+    })
+  }
+
+  const handleResubmit = () => {
+    if (!version) return
+    resubmitVersion.mutate(version.id, {
+      onSuccess: () => toast.success(`Đã gửi lại phiên bản ${version.version} tới ${roleMeta(assignedRole).name}`),
+      onError: fail,
+    })
+  }
+
+  const handleToggleIndefinite = (value: boolean) => {
+    if (!version) return
+    setIndefinite.mutate({ versionId: version.id, indefinite: value }, {
+      onSuccess: () => toast.success(value ? 'Đã bật hiệu lực vô thời hạn' : 'Đã tắt hiệu lực vô thời hạn'),
+      onError: fail,
+    })
+  }
+
+  const handleApplyNow = () => {
+    if (!version) return
+    applyNow.mutate(version.id, {
+      onSuccess: (applied) => {
+        setApplyOpen(false)
+        toast.success(`Đã áp dụng phiên bản ${applied.version} từ hôm nay`)
+      },
+      onError: (e) => {
+        setApplyOpen(false)
+        fail(e)
+      },
     })
   }
 
@@ -126,10 +179,6 @@ export default function VersionWorkspacePage() {
     } finally {
       setDownloading(false)
     }
-  }
-
-  const createNext = () => {
-    navigate(`/products/${productId}/versions/new`)
   }
 
   if (loadingProducts || (product && loadingVersions)) return <WorkspaceSkeleton />
@@ -172,20 +221,25 @@ export default function VersionWorkspacePage() {
               <span className="text-white/40">/</span>
               <Link to={`/products/${product.id}`} className="max-w-[16rem] truncate text-white/70 transition hover:text-white">{product.name}</Link>
               <span className="text-white/40">/</span>
-              <span className="text-white/70">Cập nhật phiên bản</span>
+              <span className="text-white/70">Chi tiết phiên bản</span>
             </nav>
 
             <div className="mt-3 flex flex-wrap items-center gap-2">
               <span className="rounded-full bg-white/15 px-2.5 py-1 font-mono text-[11px] font-bold tracking-wide ring-1 ring-white/20">{product.code}</span>
-              <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold ring-1 ring-white/20 ${version.stage === 'coming_soon' ? 'bg-amber-300/25 text-amber-50' : 'bg-white/15'}`}>
+              <span className={stageTone === 'red' ? 'inline-flex items-center gap-1.5 rounded-full bg-red-300/25 px-2.5 py-1 text-[11px] font-bold text-red-50 ring-1 ring-white/20' : 'inline-flex items-center gap-1.5 rounded-full bg-white/15 px-2.5 py-1 text-[11px] font-bold ring-1 ring-white/20'}>
                 {stageLabel}
               </span>
+              {version.stage === 'coming_soon' && (
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-300/20 px-2.5 py-1 text-[11px] font-bold text-amber-50 ring-1 ring-amber-200/30">
+                  <UsersRound className="size-3" /> {roleTaskLabel(version)}
+                </span>
+              )}
               <span className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-2.5 py-1 text-[11px] font-bold ring-1 ring-white/20">
                 Phiên bản {version.version}
               </span>
             </div>
 
-            <h1 className="mt-3 text-2xl font-extrabold leading-tight tracking-tight sm:text-3xl xl:text-[2.15rem]">Cập nhật phiên bản sản phẩm</h1>
+            <h1 className="mt-3 text-2xl font-extrabold leading-tight tracking-tight sm:text-3xl xl:text-[2.15rem]">Chi tiết phiên bản sản phẩm</h1>
             <p className="mt-1 text-sm font-medium text-brand-100">{product.name}</p>
 
             <div className="mt-3 flex max-w-3xl items-start gap-2.5 rounded-2xl bg-white/10 px-3.5 py-2.5 ring-1 ring-white/15 backdrop-blur">
@@ -198,87 +252,138 @@ export default function VersionWorkspacePage() {
 
             <div className="mt-3 flex flex-wrap gap-1.5 text-[11px] text-brand-50">
               <span className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 px-2.5 py-1 ring-1 ring-white/10"><CalendarCheck2 className="size-3 text-brand-200" /> Bắt đầu {formatDate(version.effectiveDate)}</span>
-              <span className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 px-2.5 py-1 ring-1 ring-white/10"><CalendarCheck2 className="size-3 text-brand-200" /> Kết thúc {formatDate(versionEndDate(version)) || '—'}</span>
-              <span className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 px-2.5 py-1 ring-1 ring-white/10"><Stamp className="size-3 text-brand-200" /> {version.approvalNo}</span>
+              <span className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 px-2.5 py-1 ring-1 ring-white/10"><CalendarX2 className="size-3 text-brand-200" /> Kết thúc {endLabel}</span>
+              <span className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 px-2.5 py-1 ring-1 ring-white/10"><ShieldCheck className="size-3 text-brand-200" /> {version.approvalNo}</span>
               <span className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 px-2.5 py-1 ring-1 ring-white/10"><FileText className="size-3 text-brand-200" /> {docs.length} tài liệu</span>
             </div>
           </div>
 
           <div className="flex w-full shrink-0 flex-col gap-2 sm:flex-row lg:w-auto lg:flex-col">
-            <Button variant="light" icon={<ArrowLeft className="size-4" />} onClick={() => navigate(`/products/${product.id}`)} className="whitespace-nowrap">
-              Về chi tiết sản phẩm
-            </Button>
-            <Button variant="glass" icon={<Download className="size-4" />} loading={downloading} onClick={handleDownloadDossier} className="whitespace-nowrap">
-              Tải hồ sơ
-            </Button>
+            {((status === 'processing' || status === 'pending') || status === 'rejected' || previous) && (
+              <div className="flex flex-wrap gap-2">
+                {(status === 'processing' || status === 'pending') && (
+                  <>
+                    <Button
+                      variant="light"
+                      icon={<Check className="size-4" />}
+                      loading={approveVersion.isPending}
+                      onClick={handleApprove}
+                      disabled={!canAct}
+                      title={canAct ? 'Duyệt hồ sơ' : `Chỉ ${roleMeta(status === 'processing' ? assignedRole : approverRole).name} được xử lý hồ sơ này`}
+                      className="whitespace-nowrap"
+                    >
+                      Duyệt hồ sơ
+                    </Button>
+                    <Button
+                      variant="glass"
+                      icon={<X className="size-4" />}
+                      onClick={() => setRejectOpen(true)}
+                      disabled={!canAct}
+                      title={canAct ? 'Từ chối hồ sơ' : 'Vai trò hiện tại không phụ trách hồ sơ này'}
+                      className="whitespace-nowrap"
+                    >
+                      Từ chối
+                    </Button>
+                  </>
+                )}
+                {status === 'rejected' && canResend && (
+                  <Button
+                    variant="light"
+                    icon={<RotateCcw className="size-4" />}
+                    loading={resubmitVersion.isPending}
+                    onClick={handleResubmit}
+                    className="whitespace-nowrap"
+                  >
+                    Gửi lại duyệt
+                  </Button>
+                )}
+                {previous && (
+                  <Button variant="glass" icon={<GitCompare className="size-4" />} onClick={() => setCompareOpen(true)} className="whitespace-nowrap">
+                    Đối chiếu chi tiết
+                  </Button>
+                )}
+              </div>
+            )}
+            {(status === 'processing' || status === 'pending') && !canAct && (
+              <p className="max-w-[18rem] rounded-xl bg-white/10 px-3 py-2 text-[10px] leading-relaxed text-brand-50 ring-1 ring-white/15">
+                Hồ sơ đang chờ {roleMeta(status === 'processing' ? assignedRole : approverRole).name} xử lý. Vai trò hiện tại: {roleMeta(role).name}.
+              </p>
+            )}
+            <div className="flex flex-wrap gap-2">
+              <Button variant="glass" icon={<ArrowLeft className="size-4" />} onClick={() => navigate(`/products/${product.id}`)} className="whitespace-nowrap">
+                Về chi tiết sản phẩm
+              </Button>
+              <Button variant="glass" icon={<Download className="size-4" />} loading={downloading} onClick={handleDownloadDossier} className="whitespace-nowrap">
+                Tải hồ sơ
+              </Button>
+            </div>
           </div>
         </div>
       </section>
 
       <ProductSearchBar className="rounded-2xl" onSelect={(p) => navigate(`/products/${p.id}`)} />
 
-      {version.stage === 'coming_soon' ? (
-        <div className="flex flex-col gap-3 rounded-2xl border border-amber-200 bg-linear-to-r from-amber-50 via-white to-amber-50/50 p-4 shadow-soft sm:flex-row sm:items-center">
-          <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-linear-to-br from-amber-400 to-amber-600 text-white">
-            <ClipboardCheck className="size-5" />
-          </span>
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-bold text-amber-900">Phiên bản {version.version} · Chờ duyệt</p>
-            <p className="mt-0.5 text-xs leading-relaxed text-amber-800/80">
-              Cập nhật thông tin, hồ sơ pháp lý, hồ sơ chuyên môn và quy cách đóng gói bên dưới. Phiên bản đã xuất hiện tại trang Phê duyệt sản phẩm.
-            </p>
-          </div>
-          <Button size="sm" variant="secondary" icon={<ShieldCheck className="size-4" />} onClick={() => navigate('/approvals')} className="shrink-0 whitespace-nowrap">
-            Xem phê duyệt
-          </Button>
-        </div>
-      ) : (
-        <div className="flex items-start gap-3 rounded-2xl border border-line bg-white p-4 shadow-soft">
-          <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-brand-50 text-brand-600">
-            <ShieldCheck className="size-5" />
-          </span>
-          <div className="min-w-0">
-            <p className="text-sm font-bold text-brand-900">Phiên bản {version.version} · {stageLabel}</p>
-            <p className="mt-0.5 text-xs leading-relaxed text-muted">
-              {readOnly ? 'Phiên bản lưu trữ chỉ được xem và tải hồ sơ, không thể chỉnh sửa.' : 'Các thay đổi được lưu trực tiếp vào hồ sơ phiên bản hiện hành.'}
-            </p>
-          </div>
-        </div>
-      )}
+      <VersionStatusNotice
+        version={version}
+        role={role}
+        canAct={canAct}
+        canResend={canResend}
+        resubmitting={resubmitVersion.isPending}
+        onOpenApprovals={() => navigate('/approvals')}
+        onResubmit={handleResubmit}
+      />
 
-      <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_20rem] xl:items-start">
-        <div className="space-y-5">
-          <GeneralInfoCard version={version} dosageName={dosageName} categoryName={categoryName} stageLabel={stageLabel} onEdit={readOnly ? undefined : () => setEditOpen(true)} />
-          <LegalFrame
+      <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_21rem] xl:items-start">
+        <div className="space-y-4 rounded-[2rem] border border-brand-100 bg-linear-to-b from-brand-50/60 via-white to-white p-3 shadow-soft sm:p-4">
+          <div className="flex flex-wrap items-center justify-between gap-2 px-1">
+            <div>
+              <p className="text-[9px] font-bold uppercase tracking-[0.16em] text-brand-600">Hồ sơ phiên bản</p>
+              <h2 className="text-lg font-extrabold tracking-tight text-brand-900">Phiên bản {version.version}</h2>
+            </div>
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="text-[10px] font-semibold text-muted">{stageLabel}</span>
+              <span className="text-[10px] text-muted">·</span>
+              <span className="text-[10px] text-muted">{docs.filter((d) => d.verified).length}/{docs.length} tệp đã ký</span>
+            </div>
+          </div>
+
+          <GeneralInfoCard
             version={version}
-            docs={docsByGroup(docs, 'legal')}
+            dosageName={dosageName}
+            categoryName={categoryName}
             stageLabel={stageLabel}
-            onView={setViewerDoc}
-            onDownload={handleDownloadDoc}
-            onAdd={readOnly ? undefined : () => openUpload(LEGAL_TARGET)}
+            onEdit={canEditInfo ? () => setEditOpen(true) : undefined}
           />
-          <UsageFrame version={version} previous={previous} docs={docsByGroup(docs, 'usage').filter((d) => !d.shared)} onView={setViewerDoc} onDownload={handleDownloadDoc} />
-          <SharedDocsFrame
+          <ChangeNoteFrame version={version} />
+          <EffectiveValidityFrame
             version={version}
-            docs={docs}
-            editable={!readOnly}
-            onView={setViewerDoc}
-            onDownload={handleDownloadDoc}
-            onUploadProfessional={() => openUpload(PROFESSIONAL_TARGET)}
-            onUploadSharedUsage={() => openUpload(SHARED_USAGE_TARGET)}
+            applying={applyNow.isPending}
+            savingIndefinite={setIndefinite.isPending}
+            canEditDates={canEditDates}
+            canApplyRole={canApply}
+            roleName={roleMeta(role).name}
+            onApplyNow={() => setApplyOpen(true)}
+            onToggleIndefinite={handleToggleIndefinite}
+            onEditDates={() => setDatesOpen(true)}
           />
-          <PackagingFrame product={product} version={version} onView={setViewerDoc} onDownload={handleDownloadDoc} />
+          <ChangeSummaryFrame
+            version={version}
+            previous={previous}
+            dosageName={dosageName}
+            categoryName={categoryName}
+            previousDosageName={previousDosageName}
+            previousCategoryName={previousCategoryName}
+          />
+          <SignedDocsFrame version={version} docs={docs} onView={setViewerDoc} onDownload={handleDownloadDoc} />
         </div>
 
         <aside className="xl:sticky xl:top-20 xl:self-start">
-          <VersionSidePanel
-            version={version}
-            stageLabel={stageLabel}
-            previous={previous}
-            docCount={docs.length}
-            canCreate={!readOnly}
-            onCreateNext={createNext}
-            onBack={() => navigate(`/products/${product.id}`)}
+          <LifecyclePanel
+            versions={sorted}
+            selectedId={version.id}
+            canCreate={role !== 'commercial'}
+            onPreview={(v) => navigate(`/products/${productId}/versions/${v.id}`)}
+            onCreate={() => navigate(`/products/${productId}/versions/new`)}
           />
         </aside>
       </div>
@@ -295,18 +400,48 @@ export default function VersionWorkspacePage() {
         />
       )}
 
-      {uploadTarget && (
-        <UploadDocumentModal
+      {datesOpen && (
+        <VersionDatesModal
           open
-          target={uploadTarget}
-          product={product}
           version={version}
-          docCount={docs.length}
-          saving={saveDocs.isPending}
-          onClose={() => setUploadTarget(null)}
-          onSubmit={submitDoc}
+          saving={updateInfo.isPending}
+          onClose={() => setDatesOpen(false)}
+          onSubmit={submitInfo}
         />
       )}
+
+      <RejectVersionModal
+        open={rejectOpen}
+        product={product}
+        version={version}
+        saving={rejectVersion.isPending}
+        onClose={() => setRejectOpen(false)}
+        onSubmit={handleReject}
+      />
+
+      {compareOpen && (
+        <CompareVersionModal
+          open
+          target={version}
+          versions={sorted}
+          onClose={() => setCompareOpen(false)}
+          onSelect={(older) => {
+            setCompareOpen(false)
+            navigate(`/products/${productId}/compare/${older.id}/${version.id}`)
+          }}
+        />
+      )}
+
+      <ConfirmDialog
+        open={applyOpen}
+        title="Áp dụng phiên bản ngay"
+        message={`Bạn có muốn áp dụng phiên bản này ngay lập tức không? Phiên bản ${version.version} sẽ trở thành phiên bản đang lưu hành từ hôm nay; phiên bản hiện tại sẽ chuyển sang lưu trữ.`}
+        confirmText="Áp dụng ngay"
+        confirmVariant="primary"
+        loading={applyNow.isPending}
+        onConfirm={handleApplyNow}
+        onClose={() => setApplyOpen(false)}
+      />
 
       <DocumentViewerModal
         open={!!viewerDoc}
@@ -321,64 +456,101 @@ export default function VersionWorkspacePage() {
   )
 }
 
-interface SidePanelProps {
+function VersionStatusNotice({
+  version, role, canAct, canResend, resubmitting, onOpenApprovals, onResubmit,
+}: {
   version: ProductVersion
-  stageLabel: string
-  previous?: ProductVersion
-  docCount: number
-  canCreate: boolean
-  onCreateNext: () => void
-  onBack: () => void
-}
+  role: RoleKey
+  canAct: boolean
+  canResend: boolean
+  resubmitting: boolean
+  onOpenApprovals: () => void
+  onResubmit: () => void
+}) {
+  const status = approvalStatusOf(version)
+  const approval = approvalMetaOf(version)
+  const coming = version.stage === 'coming_soon'
+  const assigned = roleMeta(assignedRoleOf(version)).name
+  const approver = roleMeta(approverRoleOf(version)).name
+  const rejectedBy = roleMeta(version.rejectedByRole ?? assignedRoleOf(version)).name
 
-function VersionSidePanel({ version, stageLabel, previous, docCount, canCreate, onCreateNext, onBack }: SidePanelProps) {
-  const stage = STAGE_META[version.stage]
-  return (
-    <section className="overflow-hidden rounded-3xl border border-line bg-white shadow-soft">
-      <header className="relative overflow-hidden bg-linear-to-br from-brand-900 via-brand-700 to-brand-600 px-5 py-5 text-white">
-        <div className="hex-pattern pointer-events-none absolute inset-0 opacity-50" aria-hidden />
-        <div className="relative">
-          <p className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.16em] text-brand-100">
-            <ClipboardCheck className="size-3.5" /> Trạng thái phiên bản
+  if (version.stage === 'current') {
+    return (
+      <div className="flex items-start gap-3 rounded-2xl border border-emerald-200 bg-linear-to-r from-emerald-50 via-white to-white p-4 shadow-soft">
+        <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-linear-to-br from-emerald-400 to-emerald-600 text-white">
+          <ShieldCheck className="size-5" />
+        </span>
+        <div className="min-w-0">
+          <p className="text-sm font-bold text-emerald-900">Phiên bản {version.version} · Đang lưu hành</p>
+          <p className="mt-0.5 text-xs leading-relaxed text-emerald-800/80">
+            Phiên bản đang được sử dụng chính thức{version.appliedAt ? ` từ ${formatDate(version.appliedAt)}` : ''}. Hiệu lực {formatDate(version.effectiveDate)} – {version.indefinite ? 'Vô thời hạn' : formatDate(versionEndDate(version)) || '—'}.
           </p>
-          <h2 className="mt-1 text-xl font-extrabold tracking-tight">Phiên bản {version.version}</h2>
-          <span className="mt-2 inline-flex rounded-full bg-white/15 px-2.5 py-0.5 text-[10px] font-bold ring-1 ring-white/20">{stageLabel}</span>
         </div>
-      </header>
-
-      <div className="space-y-2.5 px-4 py-4">
-        {[
-          ['Ngày bắt đầu hiệu lực', formatDate(version.effectiveDate)],
-          ['Ngày kết thúc hiệu lực', formatDate(versionEndDate(version)) || '—'],
-          ['Cập nhật gần nhất', formatDate(version.updatedAt)],
-          ['Quyết định', version.approvalNo],
-          ['Người phê duyệt', version.approvedBy],
-          ['Kế thừa từ', previous ? `Phiên bản ${previous.version}` : 'Hồ sơ gốc'],
-          ['Tài liệu', `${docCount} tài liệu`],
-        ].map(([label, value]) => (
-          <div key={label} className="rounded-xl border border-line bg-brand-50/40 px-3 py-2">
-            <p className="text-[9px] font-bold uppercase tracking-wide text-muted">{label}</p>
-            <p className="mt-0.5 truncate text-xs font-semibold text-brand-900" title={value}>{value}</p>
-          </div>
-        ))}
-
-        <div className="rounded-xl bg-brand-50/70 px-3 py-2.5 text-[11px] leading-relaxed text-brand-800">
-          {version.stage === 'coming_soon'
-            ? `Phiên bản đang chờ duyệt. Sau khi được duyệt và tới ngày ${formatDate(version.effectiveDate)}, có thể đưa vào sử dụng.`
-            : stage.description}
-        </div>
-
-        <div className="space-y-2 pt-1">
-          <Button variant="secondary" size="sm" icon={<RotateCcw className="size-4" />} onClick={onBack} className="w-full">
-            Về chi tiết sản phẩm
-          </Button>
-          <Button variant="ghost" size="sm" icon={<ShieldCheck className="size-4" />} onClick={onCreateNext} className="w-full" disabled={!canCreate}>
-            Tạo phiên bản mới
-          </Button>
-        </div>
-        <p className="text-center text-[10px] text-muted">Bản đang cập nhật: v{version.version}</p>
       </div>
-    </section>
+    )
+  }
+
+  if (!coming) {
+    return (
+      <div className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-linear-to-r from-amber-50 via-white to-amber-50/50 p-4 shadow-soft">
+        <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-linear-to-br from-amber-400 to-amber-600 text-white"><ClipboardCheck className="size-5" /></span>
+        <div className="min-w-0">
+          <p className="text-sm font-bold text-amber-900">Phiên bản {version.version} · Lưu trữ</p>
+          <p className="mt-0.5 text-xs leading-relaxed text-amber-800/80">Phiên bản lưu trữ chỉ được xem và tải hồ sơ, không thể chỉnh sửa.</p>
+        </div>
+      </div>
+    )
+  }
+
+  const tone = status === 'rejected'
+    ? 'border-red-200 bg-linear-to-r from-red-50 via-white to-red-50/50'
+    : status === 'approved'
+      ? 'border-emerald-200 bg-linear-to-r from-emerald-50 via-white to-emerald-50/50'
+      : status === 'pending'
+        ? 'border-brand-200 bg-linear-to-r from-brand-50 via-white to-brand-50/50'
+        : 'border-amber-200 bg-linear-to-r from-amber-50 via-white to-amber-50/50'
+  const iconTone = status === 'rejected'
+    ? 'from-red-400 to-red-600'
+    : status === 'approved'
+      ? 'from-emerald-400 to-emerald-600'
+      : status === 'pending'
+        ? 'from-brand-400 to-brand-600'
+        : 'from-amber-400 to-amber-600'
+  const titleTone = status === 'rejected' ? 'text-red-900' : status === 'approved' ? 'text-emerald-900' : status === 'pending' ? 'text-brand-900' : 'text-amber-900'
+  const textTone = status === 'rejected' ? 'text-red-800/80' : status === 'approved' ? 'text-emerald-800/80' : status === 'pending' ? 'text-brand-800/80' : 'text-amber-800/80'
+
+  const description = status === 'rejected'
+    ? `Hồ sơ bị ${rejectedBy} từ chối${version.rejectedReason ? `: ${version.rejectedReason}` : '.'} Cập nhật nội dung và gửi lại để tổ phụ trách duyệt lại.`
+    : status === 'approved'
+      ? 'Hồ sơ đã hoàn tất phê duyệt và được ký xác thực. Có thể áp dụng ngay hoặc chờ tới ngày hiệu lực.'
+      : status === 'pending'
+        ? `${assigned} đã xử lý hồ sơ. Hồ sơ đang chờ ${approver} phê duyệt cuối.`
+        : canAct
+          ? `Hồ sơ đã được gửi tự động tới ${assigned}. Bạn có thể duyệt để chuyển sang Chờ duyệt hoặc từ chối kèm lý do.`
+          : `Hồ sơ đã được gửi tự động tới ${assigned}. Vai trò hiện tại (${roleMeta(role).name}) chỉ theo dõi cho tới khi tổ phụ trách xử lý.`
+
+  return (
+    <div className={`flex flex-col gap-3 rounded-2xl border p-4 shadow-soft sm:flex-row sm:items-center ${tone}`}>
+      <span className={`grid size-10 shrink-0 place-items-center rounded-xl bg-linear-to-br text-white ${iconTone}`}>
+        {status === 'rejected' ? <X className="size-5" /> : status === 'approved' ? <Check className="size-5" /> : status === 'pending' ? <ShieldCheck className="size-5" /> : <ClipboardCheck className="size-5" />}
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className={`text-sm font-bold ${titleTone}`}>Phiên bản {version.version} · {approval.label}</p>
+        <p className={`mt-0.5 text-xs leading-relaxed ${textTone}`}>{description}</p>
+      </div>
+      <div className="flex shrink-0 flex-wrap gap-2">
+        {(status === 'processing' || status === 'pending') && (
+          <Button size="sm" variant="secondary" icon={<UsersRound className="size-4" />} onClick={onOpenApprovals} className="whitespace-nowrap">
+            Xem tổ phụ trách
+          </Button>
+        )}
+        {status === 'rejected' && canResend && (
+          <Button size="sm" variant="secondary" icon={<RotateCcw className="size-4" />} loading={resubmitting} onClick={onResubmit} className="whitespace-nowrap">
+            Gửi lại duyệt
+          </Button>
+        )}
+      </div>
+    </div>
   )
 }
 
@@ -398,7 +570,7 @@ function WorkspaceSkeleton() {
     <div className="space-y-5">
       <div className="skeleton h-64 rounded-[1.75rem]" />
       <div className="skeleton h-14 rounded-2xl" />
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_20rem]">
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_21rem]">
         <div className="space-y-5">
           <div className="skeleton h-72 rounded-3xl" />
           <div className="skeleton h-80 rounded-3xl" />
