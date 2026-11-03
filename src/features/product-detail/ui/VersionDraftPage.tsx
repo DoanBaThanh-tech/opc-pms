@@ -1,11 +1,12 @@
 import { useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import {
-  ArrowLeft, CalendarCheck2, CalendarX2, CheckCircle2, ClipboardCheck, FileText, PackageSearch, Plus, Sparkles,
+  ArrowLeft, CalendarCheck2, CalendarX2, CheckCircle2, ClipboardCheck, FileText, PackageSearch, Pencil, Plus, Sparkles,
 } from 'lucide-react'
 import { Button } from '@/core/components/Button'
 import { ConfirmDialog } from '@/core/components/ConfirmDialog'
 import { useToast } from '@/core/components/Toast'
+import { useCurrentRole } from '@/core/auth/roleStore'
 import type { ApiError } from '@/core/types/common'
 import { formatDate } from '@/core/utils/format'
 import { useLookups } from '@/features/products/logic/useLookups'
@@ -18,7 +19,7 @@ import type { PackagingSpec, ProductVersion, UpdateVersionInfoInput, VersionDocu
 import { useCreateVersion, useProductVersions } from '../logic/useProductVersions'
 import { applyVersionInfo } from '../logic/versionUpdates'
 import {
-  getCurrentVersion, sortVersions, suggestNextVersionAfter, versionEndDate,
+  getCurrentVersion, isEffectiveDateAllowed, MIN_EFFECTIVE_DATE_LABEL, sortVersions, suggestNextVersionAfter, versionEndDate,
 } from '../logic/versionUtils'
 import { DocumentViewerModal } from './DocumentViewerModal'
 import { EditVersionInfoModal } from './EditVersionInfoModal'
@@ -55,6 +56,8 @@ export default function VersionDraftPage() {
   const productId = Number(id)
   const navigate = useNavigate()
   const toast = useToast()
+  const role = useCurrentRole()
+  const canEditDates = role === 'ra'
 
   const { data: products = [], isLoading: loadingProducts } = useProducts()
   const { data: versions = [], isLoading: loadingVersions } = useProductVersions(Number.isFinite(productId) ? productId : 0)
@@ -141,6 +144,11 @@ export default function VersionDraftPage() {
     }
     if (!activeDraft.effectiveDate || !endDate) {
       toast.error('Vui lòng nhập đầy đủ ngày bắt đầu và ngày kết thúc hiệu lực.')
+      setEditOpen(true)
+      return
+    }
+    if (!isEffectiveDateAllowed(activeDraft.effectiveDate)) {
+      toast.error(`Ngày bắt đầu hiệu lực phải từ ${MIN_EFFECTIVE_DATE_LABEL} trở về sau.`)
       setEditOpen(true)
       return
     }
@@ -317,6 +325,8 @@ export default function VersionDraftPage() {
             endDate={endDate}
             docCount={docs.length}
             specCount={specs.length}
+            canEditDates={canEditDates}
+            onEditDates={() => setEditOpen(true)}
             onBack={() => navigate(`/products/${product.id}`)}
           />
         </aside>
@@ -367,6 +377,7 @@ export default function VersionDraftPage() {
           dosageForms={lookups.dosageForms}
           categories={lookups.categories}
           saving={false}
+          canEditDates={canEditDates}
           onClose={() => setEditOpen(false)}
           onSubmit={submitInfo}
         />
@@ -415,10 +426,12 @@ interface SidePanelProps {
   endDate: string
   docCount: number
   specCount: number
+  canEditDates: boolean
+  onEditDates: () => void
   onBack: () => void
 }
 
-function DraftSidePanel({ draft, base, endDate, docCount, specCount, onBack }: SidePanelProps) {
+function DraftSidePanel({ draft, base, endDate, docCount, specCount, canEditDates, onEditDates, onBack }: SidePanelProps) {
   return (
     <section className="overflow-hidden rounded-3xl border border-line bg-white shadow-soft">
       <header className="relative overflow-hidden bg-linear-to-br from-brand-900 via-brand-700 to-brand-600 px-5 py-5 text-white">
@@ -449,9 +462,19 @@ function DraftSidePanel({ draft, base, endDate, docCount, specCount, onBack }: S
           </div>
         ))}
 
+        {canEditDates && (
+          <Button size="sm" variant="ghost" icon={<Pencil className="size-3.5" />} onClick={onEditDates} className="w-full">
+            Chỉnh sửa ngày hiệu lực
+          </Button>
+        )}
+
         <div className="rounded-xl bg-amber-50 px-3 py-2.5 text-[11px] leading-relaxed text-amber-900 ring-1 ring-amber-100">
           Bản nháp chỉ tồn tại trên trang này. Rời trang trước khi xác nhận sẽ bỏ các thay đổi chưa tạo.
         </div>
+
+        <p className="px-1 text-[10px] leading-relaxed text-muted">
+          Ngày bắt đầu hiệu lực tối thiểu: <b>{MIN_EFFECTIVE_DATE_LABEL}</b>.
+        </p>
 
         <div className="pt-1">
           <Button variant="secondary" size="sm" icon={<ArrowLeft className="size-4" />} onClick={onBack} className="w-full">

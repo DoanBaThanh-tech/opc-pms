@@ -395,6 +395,7 @@ export default function VersionWorkspacePage() {
           dosageForms={lookups.dosageForms}
           categories={lookups.categories}
           saving={updateInfo.isPending}
+          canEditDates={canEditDates}
           onClose={() => setEditOpen(false)}
           onSubmit={submitInfo}
         />

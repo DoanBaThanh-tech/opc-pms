@@ -7,7 +7,9 @@ import { Select } from '@/core/components/Select'
 import { Textarea } from '@/core/components/Textarea'
 import type { CatalogItem } from '@/core/types/catalog'
 import type { ProductVersion, UpdateVersionInfoInput } from '../logic/types'
-import { versionEndDate } from '../logic/versionUtils'
+import {
+  isEffectiveDateAllowed, MIN_EFFECTIVE_DATE, MIN_EFFECTIVE_DATE_LABEL, versionEndDate,
+} from '../logic/versionUtils'
 
 interface Props {
   open: boolean
@@ -15,11 +17,15 @@ interface Props {
   dosageForms: CatalogItem[]
   categories: CatalogItem[]
   saving: boolean
+  /** Chỉ vai trò được phân quyền (Tổ ĐK Thuốc) mới được sửa ngày hiệu lực. */
+  canEditDates?: boolean
   onClose: () => void
   onSubmit: (input: UpdateVersionInfoInput) => void
 }
 
-export function EditVersionInfoModal({ open, version, dosageForms, categories, saving, onClose, onSubmit }: Props) {
+export function EditVersionInfoModal({
+  open, version, dosageForms, categories, saving, canEditDates = true, onClose, onSubmit,
+}: Props) {
   const [form, setForm] = useState<UpdateVersionInfoInput>({
     version: version.version,
     effectiveDate: version.effectiveDate.slice(0, 10),
@@ -43,6 +49,10 @@ export function EditVersionInfoModal({ open, version, dosageForms, categories, s
   const submit = () => {
     if (!/^\d+(\.\d+){0,3}$/.test(form.version.trim())) { setError('Số phiên bản hợp lệ: 2.2 hoặc 2.2.1'); return }
     if (!form.effectiveDate) { setError('Chọn ngày bắt đầu hiệu lực.'); return }
+    if (!isEffectiveDateAllowed(form.effectiveDate)) {
+      setError(`Ngày bắt đầu hiệu lực phải từ ${MIN_EFFECTIVE_DATE_LABEL} trở về sau.`)
+      return
+    }
     if (!form.indefinite && !form.endDate) { setError('Chọn ngày kết thúc hiệu lực hoặc tích "Hiệu lực vô thời hạn".'); return }
     if (!form.indefinite && form.endDate < form.effectiveDate) { setError('Ngày kết thúc hiệu lực phải sau hoặc bằng ngày bắt đầu.'); return }
     if (!form.activeIngredients.trim()) { setError('Nhập hoạt chất & hàm lượng.'); return }
@@ -79,13 +89,30 @@ export function EditVersionInfoModal({ open, version, dosageForms, categories, s
       <div className="grid gap-4 sm:grid-cols-2">
         <Input label="Số phiên bản *" value={form.version} onChange={(e) => set('version', e.target.value)} placeholder="VD: 2.2" />
         <Input label="Số đăng ký" value={version.registrationNo || '—'} disabled icon={<Lock className="size-4" />} className="cursor-not-allowed bg-slate-50 text-muted" />
-        <Input label="Ngày bắt đầu hiệu lực *" type="date" value={form.effectiveDate} onChange={(e) => set('effectiveDate', e.target.value)} />
-        <Input label="Ngày kết thúc hiệu lực" type="date" value={form.endDate} disabled={form.indefinite} onChange={(e) => set('endDate', e.target.value)} className={form.indefinite ? 'cursor-not-allowed bg-slate-50 text-muted' : undefined} />
-        <label className="sm:col-span-2 flex cursor-pointer items-start gap-3 rounded-xl border border-brand-100 bg-brand-50/50 px-3.5 py-3">
+        <Input
+          label="Ngày bắt đầu hiệu lực *"
+          type="date"
+          min={MIN_EFFECTIVE_DATE}
+          value={form.effectiveDate}
+          disabled={!canEditDates}
+          onChange={(e) => set('effectiveDate', e.target.value)}
+          className={!canEditDates ? 'cursor-not-allowed bg-slate-50 text-muted' : undefined}
+        />
+        <Input
+          label="Ngày kết thúc hiệu lực"
+          type="date"
+          min={form.effectiveDate || MIN_EFFECTIVE_DATE}
+          value={form.endDate}
+          disabled={form.indefinite || !canEditDates}
+          onChange={(e) => set('endDate', e.target.value)}
+          className={form.indefinite || !canEditDates ? 'cursor-not-allowed bg-slate-50 text-muted' : undefined}
+        />
+        <label className={`sm:col-span-2 flex items-start gap-3 rounded-xl border border-brand-100 bg-brand-50/50 px-3.5 py-3 ${canEditDates ? 'cursor-pointer' : 'cursor-not-allowed opacity-75'}`}>
           <input
             type="checkbox"
             className="mt-0.5 size-4 accent-brand-600"
             checked={!!form.indefinite}
+            disabled={!canEditDates}
             onChange={(e) => set('indefinite', e.target.checked)}
           />
           <span>
@@ -95,6 +122,10 @@ export function EditVersionInfoModal({ open, version, dosageForms, categories, s
             </span>
           </span>
         </label>
+        <p className="sm:col-span-2 rounded-xl bg-brand-50/60 px-3 py-2 text-[11px] leading-relaxed text-brand-800">
+          Ngày bắt đầu hiệu lực tối thiểu là <b>{MIN_EFFECTIVE_DATE_LABEL}</b>.
+          {!canEditDates && ' Chỉ Tổ ĐK Thuốc được phân quyền chỉnh sửa ngày hiệu lực.'}
+        </p>
         <Select
           label="Dạng bào chế"
           options={dosageForms.map((d) => ({ value: d.id, label: d.name }))}

@@ -60,6 +60,18 @@ export function todayIso() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
+/**
+ * Ngày bắt đầu hiệu lực tối thiểu theo yêu cầu nghiệp vụ: 03/11/2026.
+ * Khi chính thức vận hành có thể chuyển giá trị này sang cấu hình hệ thống.
+ */
+export const MIN_EFFECTIVE_DATE = '2026-11-03'
+export const MIN_EFFECTIVE_DATE_LABEL = '03/11/2026'
+
+/** Kiểm tra ngày bắt đầu hiệu lực có nằm trong khoảng được phép. */
+export function isEffectiveDateAllowed(value: string) {
+  return !!value && value.slice(0, 10) >= MIN_EFFECTIVE_DATE
+}
+
 /** Phiên bản chỉ được đưa vào sử dụng từ ngày hiệu lực. */
 export function isVersionDue(version: ProductVersion, onDate = todayIso()) {
   return version.effectiveDate.slice(0, 10) <= onDate

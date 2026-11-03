@@ -4,7 +4,9 @@ import { Button } from '@/core/components/Button'
 import { Input } from '@/core/components/Input'
 import { Modal } from '@/core/components/Modal'
 import type { ProductVersion, UpdateVersionInfoInput } from '../logic/types'
-import { versionEndDate } from '../logic/versionUtils'
+import {
+  isEffectiveDateAllowed, MIN_EFFECTIVE_DATE, MIN_EFFECTIVE_DATE_LABEL, versionEndDate,
+} from '../logic/versionUtils'
 
 interface Props {
   open: boolean
@@ -23,6 +25,10 @@ export function VersionDatesModal({ open, version, saving, onClose, onSubmit }: 
 
   const submit = () => {
     if (!start) { setError('Chọn ngày bắt đầu hiệu lực.'); return }
+    if (!isEffectiveDateAllowed(start)) {
+      setError(`Ngày bắt đầu hiệu lực phải từ ${MIN_EFFECTIVE_DATE_LABEL} trở về sau.`)
+      return
+    }
     if (!indefinite && !end) { setError('Chọn ngày kết thúc hiệu lực hoặc tích "Hiệu lực vô thời hạn".'); return }
     if (!indefinite && end < start) { setError('Ngày kết thúc hiệu lực phải sau hoặc bằng ngày bắt đầu.'); return }
     onSubmit({
@@ -62,10 +68,11 @@ export function VersionDatesModal({ open, version, saving, onClose, onSubmit }: 
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
-        <Input label="Ngày bắt đầu có hiệu lực *" type="date" value={start} onChange={(e) => setStart(e.target.value)} />
+        <Input label="Ngày bắt đầu có hiệu lực *" type="date" min={MIN_EFFECTIVE_DATE} value={start} onChange={(e) => setStart(e.target.value)} />
         <Input
           label="Ngày kết thúc có hiệu lực"
           type="date"
+          min={start || MIN_EFFECTIVE_DATE}
           value={end}
           disabled={indefinite}
           onChange={(e) => setEnd(e.target.value)}
@@ -82,8 +89,8 @@ export function VersionDatesModal({ open, version, saving, onClose, onSubmit }: 
         </label>
         {error && <p className="sm:col-span-2 rounded-xl bg-red-50 px-3 py-2 text-xs font-medium text-red-700">{error}</p>}
         <p className="sm:col-span-2 text-[11px] leading-relaxed text-muted">
-          Tổ ĐK Thuốc phụ trách cấu hình thời gian hiệu lực. Khi hết hạn, người có quyền có thể điều chỉnh ngày kết thúc
-          để phiên bản tiếp tục được sử dụng.
+          Ngày bắt đầu hiệu lực tối thiểu là <b>{MIN_EFFECTIVE_DATE_LABEL}</b>. Tổ ĐK Thuốc phụ trách cấu hình thời gian hiệu lực.
+          Khi hết hạn, người có quyền có thể điều chỉnh ngày kết thúc để phiên bản tiếp tục được sử dụng.
         </p>
       </div>
     </Modal>

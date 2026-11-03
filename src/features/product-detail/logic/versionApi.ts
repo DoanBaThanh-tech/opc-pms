@@ -13,7 +13,7 @@ import {
   approvalStatusOf, approverRoleOf, canRoleAct, canRoleResubmit, inferRoleScope,
 } from './approvalUtils'
 import { applyVersionInfo } from './versionUpdates'
-import { compareVersion, isVersionDue, sortVersions } from './versionUtils'
+import { compareVersion, isEffectiveDateAllowed, isVersionDue, MIN_EFFECTIVE_DATE_LABEL, sortVersions } from './versionUtils'
 
 export const versionsDb = createMockCollection<ProductVersion>('product_versions', seedVersions)
 
@@ -116,6 +116,12 @@ export const versionApi = {
     if (!versions.length) throw mockError('Chưa có dữ liệu phiên bản để kế thừa.', 409)
     if (versions.some((v) => v.version.trim().toLowerCase() === input.version.trim().toLowerCase())) {
       throw mockError(`Phiên bản ${input.version.trim()} đã tồn tại.`, 409)
+    }
+    if (!isEffectiveDateAllowed(input.effectiveDate)) {
+      throw mockError(`Ngày bắt đầu hiệu lực phải từ ${MIN_EFFECTIVE_DATE_LABEL} trở về sau.`, 400)
+    }
+    if (input.endDate < input.effectiveDate.slice(0, 10)) {
+      throw mockError('Ngày kết thúc hiệu lực phải sau hoặc bằng ngày bắt đầu.', 400)
     }
 
     const base = versions.find((v) => v.stage === 'current') ?? sortVersions(versions)[0]
@@ -225,6 +231,12 @@ export const versionApi = {
       (v) => v.productId === productId && v.id !== versionId && v.version.trim().toLowerCase() === nextVersion.toLowerCase(),
     )
     if (duplicated) throw mockError(`Phiên bản ${nextVersion} đã tồn tại.`, 409)
+    if (!isEffectiveDateAllowed(input.effectiveDate)) {
+      throw mockError(`Ngày bắt đầu hiệu lực phải từ ${MIN_EFFECTIVE_DATE_LABEL} trở về sau.`, 400)
+    }
+    if (input.endDate < input.effectiveDate.slice(0, 10)) {
+      throw mockError('Ngày kết thúc hiệu lực phải sau hoặc bằng ngày bắt đầu.', 400)
+    }
 
     const updated = versionsDb.patch(versionId, applyVersionInfo(target, input, product.code, now()))
 

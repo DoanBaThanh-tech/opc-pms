@@ -6,6 +6,10 @@ export const env = {
   useMock,
   /** Nhà cung cấp lưu ảnh: mock | http | cloudinary | s3 | azure. Mặc định http khi chạy với BE. */
   mediaProvider: import.meta.env.VITE_MEDIA_PROVIDER ?? (useMock ? 'mock' : 'http'),
+  /** Cloudinary unsigned upload – chỉ dùng cho FE demo, không chứa API secret. */
+  cloudinaryCloudName: import.meta.env.VITE_CLOUDINARY_CLOUD_NAME ?? '',
+  cloudinaryUploadPreset: import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET ?? '',
+  cloudinaryFolder: import.meta.env.VITE_CLOUDINARY_FOLDER ?? 'opc-pms/packaging',
   apiTimeoutMs: 15_000,
   tokenKey: 'opc_access_token',
 } as const

@@ -20,6 +20,14 @@ export interface MediaRef {
   contentType?: string
   sizeBytes?: number
   updatedAt: string
+  /** Cloudinary public_id – cần cho thao tác xóa qua backend. */
+  publicId?: string
+  width?: number
+  height?: number
+  format?: string
+  bytes?: number
+  /** Trạng thái tải ảnh ở phía client. */
+  status?: 'uploading' | 'uploaded' | 'failed'
 }
 
 interface Adapter {
