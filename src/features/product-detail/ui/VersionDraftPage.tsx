@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import {
-  ArrowLeft, CalendarCheck2, CalendarX2, CheckCircle2, ClipboardCheck, FileText, PackageSearch, Pencil, Plus, Sparkles,
+  ArrowLeft, CalendarCheck2, CalendarX2, CheckCircle2, ClipboardCheck, FileText, PackageSearch, Plus, Sparkles,
 } from 'lucide-react'
 import { Button } from '@/core/components/Button'
 import { ConfirmDialog } from '@/core/components/ConfirmDialog'
@@ -19,7 +19,8 @@ import type { PackagingSpec, ProductVersion, UpdateVersionInfoInput, VersionDocu
 import { useCreateVersion, useProductVersions } from '../logic/useProductVersions'
 import { applyVersionInfo } from '../logic/versionUpdates'
 import {
-  getCurrentVersion, isEffectiveDateAllowed, MIN_EFFECTIVE_DATE_LABEL, sortVersions, suggestNextVersionAfter, versionEndDate,
+  addMonths, getCurrentVersion, isEffectiveDateAllowed, latestVersionOf, MIN_EFFECTIVE_DATE, MIN_EFFECTIVE_DATE_LABEL,
+  sortVersions, suggestNextVersionAfter, versionEndDate,
 } from '../logic/versionUtils'
 import { DocumentViewerModal } from './DocumentViewerModal'
 import { EditVersionInfoModal } from './EditVersionInfoModal'
@@ -72,7 +73,8 @@ export default function VersionDraftPage() {
 
   const product = products.find((p) => p.id === productId)
   const sorted = useMemo(() => sortVersions(versions), [versions])
-  const base = getCurrentVersion(sorted) ?? sorted[0]
+  /** Kế thừa từ phiên bản liền trước (số phiên bản cao nhất đã có), không nhất thiết là bản đang lưu hành. */
+  const base = latestVersionOf(sorted) ?? getCurrentVersion(sorted) ?? sorted[0]
 
   /** Bản nháp khởi tạo từ phiên bản hiện hành – chỉ nằm trong bộ nhớ, chưa ghi xuống dữ liệu. */
   const initialDraft = useMemo(
@@ -102,8 +104,18 @@ export default function VersionDraftPage() {
     toast.success(`Đã cập nhật bản nháp phiên bản ${input.version}`)
   }
 
-  const submitDoc = (doc: VersionDocument) => {
+  /** Chỉnh trực tiếp ngày hiệu lực ngay trong frame Bản nháp phiên bản. */
+  const updateDates = (patch: { effectiveDate?: string; effectiveEndDate?: string }) => {
     if (!activeDraft) return
+    let effectiveEndDate = patch.effectiveEndDate ?? activeDraft.effectiveEndDate
+    if (patch.effectiveDate && !patch.effectiveEndDate) {
+      const currentEnd = activeDraft.effectiveEndDate
+      if (!currentEnd || currentEnd < patch.effectiveDate) effectiveEndDate = addMonths(patch.effectiveDate, 24)
+    }
+    setDraft({ ...activeDraft, ...patch, effectiveEndDate })
+  }
+
+  const submitDoc = (doc: VersionDocument) => {    if (!activeDraft) return
     setDraft({
       ...activeDraft,
       extraDocs: [...(activeDraft.extraDocs ?? []), doc],
@@ -144,17 +156,14 @@ export default function VersionDraftPage() {
     }
     if (!activeDraft.effectiveDate || !endDate) {
       toast.error('Vui lòng nhập đầy đủ ngày bắt đầu và ngày kết thúc hiệu lực.')
-      setEditOpen(true)
       return
     }
     if (!isEffectiveDateAllowed(activeDraft.effectiveDate)) {
       toast.error(`Ngày bắt đầu hiệu lực phải từ ${MIN_EFFECTIVE_DATE_LABEL} trở về sau.`)
-      setEditOpen(true)
       return
     }
     if (endDate < activeDraft.effectiveDate) {
       toast.error('Ngày kết thúc hiệu lực phải sau hoặc bằng ngày bắt đầu.')
-      setEditOpen(true)
       return
     }
     setConfirmOpen(true)
@@ -326,7 +335,7 @@ export default function VersionDraftPage() {
             docCount={docs.length}
             specCount={specs.length}
             canEditDates={canEditDates}
-            onEditDates={() => setEditOpen(true)}
+            onDatesChange={updateDates}
             onBack={() => navigate(`/products/${product.id}`)}
           />
         </aside>
@@ -427,11 +436,11 @@ interface SidePanelProps {
   docCount: number
   specCount: number
   canEditDates: boolean
-  onEditDates: () => void
+  onDatesChange: (patch: { effectiveDate?: string; effectiveEndDate?: string }) => void
   onBack: () => void
 }
 
-function DraftSidePanel({ draft, base, endDate, docCount, specCount, canEditDates, onEditDates, onBack }: SidePanelProps) {
+function DraftSidePanel({ draft, base, endDate, docCount, specCount, canEditDates, onDatesChange, onBack }: SidePanelProps) {
   return (
     <section className="overflow-hidden rounded-3xl border border-line bg-white shadow-soft">
       <header className="relative overflow-hidden bg-linear-to-br from-brand-900 via-brand-700 to-brand-600 px-5 py-5 text-white">
@@ -448,10 +457,28 @@ function DraftSidePanel({ draft, base, endDate, docCount, specCount, canEditDate
       </header>
 
       <div className="space-y-2.5 px-4 py-4">
+        <div className="rounded-xl border border-line bg-brand-50/40 px-3 py-2">
+          <p className="text-[9px] font-bold uppercase tracking-wide text-muted">Kế thừa từ</p>
+          <p className="mt-0.5 truncate text-xs font-semibold text-brand-900">Phiên bản {base.version}</p>
+        </div>
+
+        <DraftDateField
+          label="Ngày bắt đầu hiệu lực"
+          value={draft.effectiveDate}
+          min={MIN_EFFECTIVE_DATE}
+          editable={canEditDates}
+          onChange={(value) => onDatesChange({ effectiveDate: value })}
+        />
+        <DraftDateField
+          label="Ngày kết thúc hiệu lực"
+          value={draft.indefinite ? '' : endDate}
+          min={draft.effectiveDate || MIN_EFFECTIVE_DATE}
+          editable={canEditDates && !draft.indefinite}
+          emptyLabel={draft.indefinite ? 'Vô thời hạn' : '—'}
+          onChange={(value) => onDatesChange({ effectiveEndDate: value })}
+        />
+
         {[
-          ['Kế thừa từ', `Phiên bản ${base.version}`],
-          ['Ngày bắt đầu', formatDate(draft.effectiveDate)],
-          ['Ngày kết thúc', formatDate(endDate)],
           ['Quyết định', draft.approvalNo],
           ['Tài liệu', `${docCount} tài liệu`],
           ['Quy cách đóng gói', `${specCount} quy cách`],
@@ -462,10 +489,10 @@ function DraftSidePanel({ draft, base, endDate, docCount, specCount, canEditDate
           </div>
         ))}
 
-        {canEditDates && (
-          <Button size="sm" variant="ghost" icon={<Pencil className="size-3.5" />} onClick={onEditDates} className="w-full">
-            Chỉnh sửa ngày hiệu lực
-          </Button>
+        {!canEditDates && (
+          <p className="px-1 text-[10px] leading-relaxed text-muted">
+            Chỉ Tổ ĐK Thuốc được chỉnh sửa ngày hiệu lực.
+          </p>
         )}
 
         <div className="rounded-xl bg-amber-50 px-3 py-2.5 text-[11px] leading-relaxed text-amber-900 ring-1 ring-amber-100">
@@ -483,6 +510,34 @@ function DraftSidePanel({ draft, base, endDate, docCount, specCount, canEditDate
         </div>
       </div>
     </section>
+  )
+}
+
+interface DraftDateFieldProps {
+  label: string
+  value: string
+  min: string
+  editable: boolean
+  emptyLabel?: string
+  onChange: (value: string) => void
+}
+
+function DraftDateField({ label, value, min, editable, emptyLabel = '—', onChange }: DraftDateFieldProps) {
+  return (
+    <div className={`rounded-xl border px-3 py-2 ${editable ? 'border-brand-200 bg-brand-50/60' : 'border-line bg-brand-50/40'}`}>
+      <p className="text-[9px] font-bold uppercase tracking-wide text-muted">{label}</p>
+      {editable ? (
+        <input
+          type="date"
+          value={value}
+          min={min}
+          onChange={(e) => onChange(e.target.value)}
+          className="mt-1 w-full rounded-lg border border-line bg-white px-2 py-1.5 text-xs font-semibold text-brand-900 outline-none transition focus:border-brand-400 focus:ring-2 focus:ring-brand-100"
+        />
+      ) : (
+        <p className="mt-0.5 truncate text-xs font-semibold text-brand-900">{value ? formatDate(value) : emptyLabel}</p>
+      )}
+    </div>
   )
 }
 

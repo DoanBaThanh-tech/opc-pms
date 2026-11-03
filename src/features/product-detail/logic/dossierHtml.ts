@@ -1,7 +1,7 @@
 import { formatDate } from '@/core/utils/format'
 import { badge, changeTable, docTable, escapeHtml, footer, htmlStyles, infoGrid, letterhead, stageLabel, type HtmlContext } from './htmlShared'
 import { docsByGroup } from './documents'
-import { resolvePackagingSpecs } from './packagingSpecs'
+import { packagingPhotos, resolvePackagingSpecs } from './packagingSpecs'
 import { versionEndDate } from './versionUtils'
 
 const stageTone = { current: 'blue', coming_soon: 'amber', archived: 'gray' } as const
@@ -119,14 +119,19 @@ export function buildDossierHtml(ctx: HtmlContext, photoSrc: Record<string, stri
     <p class="lead">Danh mục ${specs.length} quy cách đóng gói kèm hồ sơ kỹ thuật và ảnh chụp thực tế.</p>
     <table>
       <thead><tr><th style="width:8%">STT</th><th>Quy cách</th><th>Hồ sơ kỹ thuật</th><th style="width:14%">Ảnh chụp</th></tr></thead>
-      <tbody>${specs.map((spec, i) => `<tr>
+      <tbody>${specs.map((spec, i) => {
+        const photoCount = packagingPhotos(spec).length
+        return `<tr>
         <td><b>${String(i + 1).padStart(2, '0')}</b></td>
         <td><b>${escapeHtml(spec.name)}</b>${spec.note ? `<br /><span class="muted">${escapeHtml(spec.note)}</span>` : ''}</td>
         <td>${escapeHtml(spec.technicalDoc.name)}<br /><span class="muted">${escapeHtml(spec.technicalDoc.code)} · ${spec.technicalDoc.pages} trang</span></td>
-        <td>${spec.photo ? 'Đã cập nhật' : 'Chưa cập nhật'}</td>
-      </tr>`).join('')}</tbody>
+        <td>${photoCount ? `${photoCount} ảnh` : 'Chưa cập nhật'}</td>
+      </tr>`
+      }).join('')}</tbody>
     </table>
-    ${specs.map((spec, i) => `<div style="display:grid;grid-template-columns:1fr 64mm;gap:14px;align-items:start;border:1px solid #dbe8f3;border-radius:12px;padding:12px;margin:10px 0">
+    ${specs.map((spec, i) => {
+      const photos = packagingPhotos(spec)
+      return `<div style="display:grid;grid-template-columns:1fr 64mm;gap:14px;align-items:start;border:1px solid #dbe8f3;border-radius:12px;padding:12px;margin:10px 0">
       <div>
         <p class="eyebrow" style="margin-bottom:2px">Quy cách ${String(i + 1).padStart(2, '0')}</p>
         <h3 style="margin:0 0 4px">${escapeHtml(spec.name)}</h3>
@@ -134,10 +139,16 @@ export function buildDossierHtml(ctx: HtmlContext, photoSrc: Record<string, stri
         <p style="margin:0;font-size:12px"><b>Hồ sơ kỹ thuật:</b> ${escapeHtml(spec.technicalDoc.name)}</p>
         <p class="muted" style="margin:2px 0 0;font-size:11px">${escapeHtml(spec.technicalDoc.code)} · ${spec.technicalDoc.pages} trang · ${formatDate(spec.technicalDoc.updatedAt)}</p>
       </div>
-      <div>${spec.photo && (photoSrc[spec.photo.id] || spec.photo.url)
-        ? `<img src="${escapeHtml(photoSrc[spec.photo.id] ?? spec.photo.url ?? '')}" alt="${escapeHtml(spec.photo.fileName)}" style="width:100%;max-height:52mm;object-fit:contain;border:1px solid #dbe8f3;border-radius:8px;background:#f6fbff" />`
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(28mm,1fr));gap:4px">${photos.length
+        ? photos.map((photo) => {
+          const src = photoSrc[photo.id] ?? photo.url ?? ''
+          return src
+            ? `<img src="${escapeHtml(src)}" alt="${escapeHtml(photo.fileName)}" style="width:100%;max-height:34mm;object-fit:contain;border:1px solid #dbe8f3;border-radius:8px;background:#f6fbff" />`
+            : '<div class="muted" style="border:1px dashed #dbe8f3;border-radius:8px;padding:8px;text-align:center;font-size:10px">Không tải được ảnh</div>'
+        }).join('')
         : '<div class="muted" style="border:1px dashed #dbe8f3;border-radius:8px;padding:16px;text-align:center;font-size:11px">Chưa có ảnh chụp thực tế</div>'}</div>
-    </div>`).join('')}
+    </div>`
+    }).join('')}
     ${sharedTechnical.length ? `<h3>Hồ sơ kỹ thuật dùng chung</h3>${docTable(sharedTechnical)}` : ''}
     ${footer(p, v)}
   </div>

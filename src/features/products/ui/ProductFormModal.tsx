@@ -72,12 +72,8 @@ export function ProductFormModal({ open, product, nextCode, dosageForms, categor
         </p>
       )}
       <form id="product-form" onSubmit={handleSubmit(onSubmit)} className="grid gap-4 sm:grid-cols-2">
-        {product ? (
-          <Input label="Mã sản phẩm" readOnly aria-readonly className="cursor-not-allowed bg-brand-50/70 text-muted" {...register('code')} />
-        ) : (
-          <input type="hidden" {...register('code')} />
-        )}
-        <div>
+        <input type="hidden" {...register('code')} />
+        <div className="sm:col-span-2">
           <Input
             label={product ? 'Phiên bản' : 'Phiên bản *'}
             placeholder="VD: 1.0"

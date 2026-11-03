@@ -1,5 +1,5 @@
 import type { Product } from '@/features/products/logic/types'
-import type { DocStatus, PackagingSpec, ProductVersion, VersionDocument } from './types'
+import type { DocStatus, PackagingPhoto, PackagingSpec, ProductVersion, VersionDocument } from './types'
 
 const STATUS_BY_STAGE: Record<ProductVersion['stage'], DocStatus> = {
   current: 'valid',
@@ -69,6 +69,12 @@ export function resolvePackagingSpecs(product: Product, version: ProductVersion)
   return specs.map((spec) => ({ ...spec, technicalDoc: { ...spec.technicalDoc, status } }))
 }
 
+/** Chuẩn hóa ảnh của quy cách: ưu tiên `photos`, fallback ảnh đại diện `photo` cũ. */
+export function packagingPhotos(spec: PackagingSpec): PackagingPhoto[] {
+  if (spec.photos?.length) return spec.photos
+  return spec.photo ? [spec.photo] : []
+}
+
 /** Nhân bản quy cách (kèm ảnh) sang phiên bản mới, cập nhật mã hồ sơ kỹ thuật theo phiên bản. */
 export function clonePackagingSpecsForVersion(
   product: Product,
@@ -91,6 +97,7 @@ export function clonePackagingSpecsForVersion(
       updatedAt,
       status: STATUS_BY_STAGE[nextStage],
     },
-    photo: spec.photo,
+    photo: spec.photos?.[0] ?? spec.photo,
+    photos: spec.photos,
   }))
 }

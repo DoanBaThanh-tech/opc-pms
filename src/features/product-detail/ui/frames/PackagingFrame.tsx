@@ -1,19 +1,16 @@
-import { useRef, useState } from 'react'
-import {
-  Boxes, Camera, Download, Eye, FileText, ImageOff, ImagePlus, Loader2, Lock, Plus, Trash2,
-} from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { Boxes, Download, Eye, FileText, Lock, Plus } from 'lucide-react'
 import { Badge } from '@/core/components/Badge'
 import { Button } from '@/core/components/Button'
-import { Modal } from '@/core/components/Modal'
 import { useToast } from '@/core/components/Toast'
-import { uploadImage } from '@/core/media/cloudMedia'
-import { MediaImage } from '@/core/media/MediaImage'
+import type { CloudinaryImage } from '@/core/media/cloudinary'
+import { CloudinaryImageManager } from '@/core/media/CloudinaryImageManager'
 import type { ApiError } from '@/core/types/common'
 import { formatDate } from '@/core/utils/format'
 import type { Product } from '@/features/products/logic/types'
 import { formatSize } from '../../logic/documents'
-import { resolvePackagingSpecs } from '../../logic/packagingSpecs'
-import { DOC_STATUS_META, type PackagingPhoto, type PackagingSpec, type ProductVersion, type VersionDocument } from '../../logic/types'
+import { packagingPhotos, resolvePackagingSpecs } from '../../logic/packagingSpecs'
+import { DOC_STATUS_META, type PackagingSpec, type ProductVersion, type VersionDocument } from '../../logic/types'
 import { useSavePackagingSpecs } from '../../logic/useProductVersions'
 import { AddPackagingSpecModal } from '../AddPackagingSpecModal'
 import { Frame } from './Frame'
@@ -29,7 +26,11 @@ interface Props {
   onSaveSpecs?: (specs: PackagingSpec[]) => Promise<void> | void
 }
 
-const nowIso = () => new Date().toISOString()
+const LIFECYCLE: Record<ProductVersion['stage'], { label: string; tone: 'green' | 'amber' | 'gray' }> = {
+  current: { label: 'Đang lưu hành', tone: 'green' },
+  coming_soon: { label: 'Coming Soon · Chờ duyệt', tone: 'amber' },
+  archived: { label: 'Lưu trữ', tone: 'gray' },
+}
 
 export function PackagingFrame({ product, version, onView, onDownload, canEdit = true, onSaveSpecs }: Props) {
   const toast = useToast()
@@ -37,10 +38,8 @@ export function PackagingFrame({ product, version, onView, onDownload, canEdit =
   const specs = resolvePackagingSpecs(product, version)
   const editable = version.stage !== 'archived' && canEdit
   const [addOpen, setAddOpen] = useState(false)
-  const [preview, setPreview] = useState<PackagingPhoto | null>(null)
-  const [uploadingId, setUploadingId] = useState<string | null>(null)
-  const fileRef = useRef<HTMLInputElement>(null)
-  const pendingSpec = useRef<string | null>(null)
+  const specsRef = useRef<PackagingSpec[]>(specs)
+  useEffect(() => { specsRef.current = specs }, [specs])
 
   const commit = async (
     next: PackagingSpec[],
@@ -67,30 +66,19 @@ export function PackagingFrame({ product, version, onView, onDownload, canEdit =
   const addSpec = (spec: PackagingSpec) =>
     void commit([...specs, spec], `Đã thêm quy cách "${spec.name}"`, { onSuccess: () => setAddOpen(false) })
 
-  const pickPhoto = (specId: string) => {
-    pendingSpec.current = specId
-    fileRef.current?.click()
+  /** Ảnh đầu tiên luôn được giữ ở `photo` để tương thích dữ liệu cũ và bản xuất hồ sơ. */
+  const updatePhotos = (specId: string, photos: CloudinaryImage[]) => {
+    const next = specsRef.current.map((spec) => (
+      spec.id === specId ? { ...spec, photos, photo: photos[0] } : spec
+    ))
+    specsRef.current = next
+    void commit(
+      next,
+      photos.length ? `Đã cập nhật ${photos.length} ảnh chụp thực tế` : 'Đã xóa toàn bộ ảnh chụp thực tế',
+    )
   }
 
-  const handleFile = async (file?: File) => {
-    const specId = pendingSpec.current
-    if (!file || !specId) return
-    setUploadingId(specId)
-    try {
-      const media = await uploadImage(file)
-      const photo: PackagingPhoto = { ...media, fileName: file.name, updatedAt: media.updatedAt || nowIso() }
-      const next = specs.map((s) => (s.id === specId ? { ...s, photo } : s))
-      await commit(next, 'Đã cập nhật ảnh chụp thực tế', { onSuccess: () => setUploadingId(null), onError: () => setUploadingId(null) })
-    } catch (e) {
-      setUploadingId(null)
-      toast.error(e instanceof Error ? e.message : 'Không đọc được ảnh.')
-    }
-  }
-
-  const removePhoto = (spec: PackagingSpec) => {
-    const next = specs.map((s) => (s.id === spec.id ? { ...s, photo: undefined } : s))
-    void commit(next, `Đã xóa ảnh chụp của "${spec.name}"`)
-  }
+  const lifecycle = LIFECYCLE[version.stage]
 
   return (
     <Frame
@@ -107,30 +95,29 @@ export function PackagingFrame({ product, version, onView, onDownload, canEdit =
         </span>
       )}
     >
+      <div className="mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-line bg-brand-50/40 px-3 py-2">
+        <span className="text-[10px] font-bold uppercase tracking-wide text-muted">Vòng đời</span>
+        <Badge tone={lifecycle.tone}>{lifecycle.label}</Badge>
+        <span className="text-[11px] leading-relaxed text-muted">
+          Ảnh bao bì được quản lý riêng theo từng quy cách đóng gói.
+        </span>
+      </div>
+
       <div className="space-y-3">
         {specs.map((spec, index) => (
           <SpecCard
             key={spec.id}
             spec={spec}
             index={index}
+            product={product}
+            version={version}
             editable={editable}
-            uploading={uploadingId === spec.id}
             onView={() => onView(spec.technicalDoc)}
             onDownload={() => onDownload(spec.technicalDoc)}
-            onPickPhoto={() => pickPhoto(spec.id)}
-            onPreviewPhoto={() => spec.photo && setPreview(spec.photo)}
-            onRemovePhoto={() => removePhoto(spec)}
+            onChangePhotos={(photos) => updatePhotos(spec.id, photos)}
           />
         ))}
       </div>
-
-      <input
-        ref={fileRef}
-        type="file"
-        accept="image/*"
-        className="sr-only"
-        onChange={(e) => { void handleFile(e.target.files?.[0]); e.target.value = '' }}
-      />
 
       {addOpen && (
         <AddPackagingSpecModal
@@ -143,21 +130,6 @@ export function PackagingFrame({ product, version, onView, onDownload, canEdit =
           onSubmit={addSpec}
         />
       )}
-
-      <Modal
-        open={!!preview}
-        title={preview?.fileName ?? 'Ảnh chụp thực tế'}
-        widthClass="md:max-w-3xl"
-        onClose={() => setPreview(null)}
-        footer={<Button variant="secondary" onClick={() => setPreview(null)}>Đóng</Button>}
-      >
-        {preview && (
-          <>
-            <MediaImage media={preview} alt={preview.fileName} className="max-h-[68dvh] w-full rounded-xl bg-brand-50 object-contain" />
-            <p className="mt-2 text-xs text-muted">Cập nhật {formatDate(preview.updatedAt)} · Lưu cloud: <span className="font-mono">{preview.id}</span></p>
-          </>
-        )}
-      </Modal>
     </Frame>
   )
 }
@@ -165,19 +137,19 @@ export function PackagingFrame({ product, version, onView, onDownload, canEdit =
 interface SpecCardProps {
   spec: PackagingSpec
   index: number
+  product: Product
+  version: ProductVersion
   editable: boolean
-  uploading: boolean
   onView: () => void
   onDownload: () => void
-  onPickPhoto: () => void
-  onPreviewPhoto: () => void
-  onRemovePhoto: () => void
+  onChangePhotos: (photos: CloudinaryImage[]) => void
 }
 
-function SpecCard({ spec, index, editable, uploading, onView, onDownload, onPickPhoto, onPreviewPhoto, onRemovePhoto }: SpecCardProps) {
+function SpecCard({ spec, index, product, version, editable, onView, onDownload, onChangePhotos }: SpecCardProps) {
   const doc = spec.technicalDoc
   const status = DOC_STATUS_META[doc.status]
   const stt = String(index + 1).padStart(2, '0')
+  const photos = packagingPhotos(spec)
 
   return (
     <article className="overflow-hidden rounded-2xl border border-line bg-white">
@@ -188,7 +160,9 @@ function SpecCard({ spec, index, editable, uploading, onView, onDownload, onPick
           <h3 className="text-sm font-extrabold leading-snug text-brand-900">{spec.name}</h3>
           {spec.note && <p className="mt-0.5 text-[11px] text-muted">{spec.note}</p>}
         </div>
-        <Badge tone={spec.photo ? 'green' : 'gray'}>{spec.photo ? 'Đã có ảnh chụp' : 'Chưa có ảnh chụp'}</Badge>
+        <Badge tone={photos.length ? 'green' : 'gray'}>
+          {photos.length ? `${photos.length} ảnh chụp` : 'Chưa có ảnh chụp'}
+        </Badge>
       </header>
 
       <div className="grid gap-2.5 p-3 sm:grid-cols-2">
@@ -219,51 +193,17 @@ function SpecCard({ spec, index, editable, uploading, onView, onDownload, onPick
           </div>
         </div>
 
-        <div className="flex flex-col rounded-xl border border-dashed border-line bg-white p-3">
-          <div className="flex items-center justify-between gap-2">
-            <p className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide text-muted">
-              <Camera className="size-3.5 text-brand-500" /> Ảnh chụp thực tế
-            </p>
-            {spec.photo && (
-              <button onClick={onPreviewPhoto} className="inline-flex items-center gap-1 text-[10px] font-bold text-brand-600 hover:underline">
-                <Eye className="size-3" /> Xem ảnh
-              </button>
-            )}
-          </div>
-
-          {spec.photo ? (
-            <button onClick={onPreviewPhoto} className="group relative mt-2 block w-full overflow-hidden rounded-lg border border-line bg-brand-50">
-              <MediaImage media={spec.photo} alt={spec.photo.fileName} className="h-32 w-full object-cover transition duration-500 group-hover:scale-105" />
-              <span className="absolute inset-0 flex items-center justify-center gap-1.5 bg-brand-900/45 text-xs font-bold text-white opacity-0 transition group-hover:opacity-100">
-                <Eye className="size-4" /> Xem ảnh
-              </span>
-            </button>
-          ) : (
-            <div className="mt-2 flex h-32 flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed border-brand-100 bg-brand-50/40 text-brand-400">
-              <ImageOff className="size-6" strokeWidth={1.5} />
-              <span className="text-[11px] font-medium">Chưa có ảnh chụp</span>
-            </div>
-          )}
-
-          <div className="mt-auto flex items-center justify-between gap-2 pt-2.5">
-            {editable ? (
-              <button
-                onClick={onPickPhoto}
-                disabled={uploading}
-                className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-brand-200 bg-white px-2.5 text-[11px] font-bold text-brand-700 transition hover:border-brand-300 hover:bg-brand-50 disabled:opacity-60"
-              >
-                {uploading ? <Loader2 className="size-3.5 animate-spin" /> : <ImagePlus className="size-3.5" />}
-                {uploading ? 'Đang lưu...' : spec.photo ? 'Thay ảnh' : 'Tải ảnh lên'}
-              </button>
-            ) : (
-              <span className="text-[10px] text-muted">Ảnh chỉ xem</span>
-            )}
-            {editable && spec.photo && (
-              <button onClick={onRemovePhoto} className="inline-flex items-center gap-1 text-[10px] font-bold text-opc-red hover:underline">
-                <Trash2 className="size-3" /> Xóa ảnh
-              </button>
-            )}
-          </div>
+        <div className="rounded-xl border border-line bg-white p-2.5">
+          <CloudinaryImageManager
+            images={photos}
+            onChange={onChangePhotos}
+            context={{ productId: product.id, versionId: version.id, specId: spec.id }}
+            disabled={!editable}
+            variant="compact"
+            title="Ảnh chụp thực tế"
+            hint="Kéo thả hoặc bấm để tải nhiều ảnh bao bì"
+            maxFiles={8}
+          />
         </div>
       </div>
     </article>

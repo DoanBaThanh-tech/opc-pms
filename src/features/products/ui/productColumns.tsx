@@ -18,7 +18,6 @@ export function buildProductColumns({ offset, lookups, onEdit, onSubmit }: Args)
   const iconBtn = 'rounded-lg p-2 text-muted transition hover:bg-brand-50 hover:text-brand-700'
   return [
     { key: 'stt', header: 'STT', hideOnCard: true, className: 'w-14 text-muted', render: (_, i) => offset + i + 1 },
-    { key: 'code', header: 'Mã SP', className: 'font-mono text-xs', render: (p) => p.code },
     {
       key: 'name', header: 'Tên sản phẩm', className: 'min-w-56',
       render: (p) => (

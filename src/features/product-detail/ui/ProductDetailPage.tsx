@@ -4,7 +4,6 @@ import { ArrowLeft, PackageSearch } from 'lucide-react'
 import { Button } from '@/core/components/Button'
 import { ConfirmDialog } from '@/core/components/ConfirmDialog'
 import { useToast } from '@/core/components/Toast'
-import { canEditPackaging } from '@/core/auth/roles'
 import { useCurrentRole } from '@/core/auth/roleStore'
 import type { ApiError } from '@/core/types/common'
 import { formatDate } from '@/core/utils/format'
@@ -173,7 +172,7 @@ export default function ProductDetailPage() {
         <div className="space-y-5 xl:col-start-1 xl:row-start-2">
           <LegalFrame version={selected} docs={docsByGroup(docs, 'legal')} onView={setViewerDoc} onDownload={handleDownloadDoc} />
           <UsageFrame version={selected} previous={previous} docs={docsByGroup(docs, 'usage').filter((d) => !d.shared)} onView={setViewerDoc} onDownload={handleDownloadDoc} />
-          <PackagingFrame product={product} version={selected} canEdit={canEditPackaging(role)} onView={setViewerDoc} onDownload={handleDownloadDoc} />
+          <PackagingFrame product={product} version={selected} canEdit={role !== 'commercial'} onView={setViewerDoc} onDownload={handleDownloadDoc} />
         </div>
       </div>
 

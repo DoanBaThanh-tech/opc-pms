@@ -7,7 +7,7 @@ import { buildDocumentHtml } from './documentHtml'
 import { docsByGroup } from './documents'
 import type { HtmlContext } from './htmlShared'
 import { getLogoDataUrl } from './logo'
-import { resolvePackagingSpecs } from './packagingSpecs'
+import { resolvePackagingSpecs, packagingPhotos } from './packagingSpecs'
 import type { ProductVersion, VersionDocument } from './types'
 
 export interface DossierArgs {
@@ -50,22 +50,27 @@ export async function downloadVersionDossier(args: DossierArgs) {
   const photoSrc: Record<string, string> = {}
   const photoFiles: { name: string; base64: string }[] = []
   for (let i = 0; i < specs.length; i++) {
-    const photo = specs[i].photo
-    if (!photo) continue
-    let dataUrl = photo.url?.startsWith('data:image/') ? photo.url : ''
-    if (!dataUrl) {
-      const blob = await getMediaBlob(photo)
-      if (blob) dataUrl = await blobToDataUrl(blob)
-    }
-    if (dataUrl) {
-      if (photo.id) photoSrc[photo.id] = dataUrl
-      const match = dataUrl.match(/^data:image\/(png|jpe?g|webp|gif);base64,(.+)$/i)
-      if (match) {
-        const ext = match[1].toLowerCase().replace('jpeg', 'jpg')
-        photoFiles.push({ name: `${String(i + 1).padStart(2, '0')}-${fileSlug(specs[i].name)}.${ext}`, base64: match[2] })
+    const photos = packagingPhotos(specs[i])
+    for (let j = 0; j < photos.length; j++) {
+      const photo = photos[j]
+      let dataUrl = photo.url?.startsWith('data:image/') ? photo.url : ''
+      if (!dataUrl) {
+        const blob = await getMediaBlob(photo)
+        if (blob) dataUrl = await blobToDataUrl(blob)
       }
-    } else if (photo.url && photo.id) {
-      photoSrc[photo.id] = photo.url
+      if (dataUrl) {
+        if (photo.id) photoSrc[photo.id] = dataUrl
+        const match = dataUrl.match(/^data:image\/(png|jpe?g|webp|gif);base64,(.+)$/i)
+        if (match) {
+          const ext = match[1].toLowerCase().replace('jpeg', 'jpg')
+          photoFiles.push({
+            name: `${String(i + 1).padStart(2, '0')}-${String(j + 1).padStart(2, '0')}-${fileSlug(specs[i].name)}.${ext}`,
+            base64: match[2],
+          })
+        }
+      } else if (photo.url && photo.id) {
+        photoSrc[photo.id] = photo.url
+      }
     }
   }
 

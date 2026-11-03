@@ -109,7 +109,10 @@ export interface PackagingSpec {
   name: string
   note?: string
   technicalDoc: VersionDocument
+  /** Ảnh đại diện (ảnh đầu tiên) – giữ để tương thích dữ liệu cũ. */
   photo?: PackagingPhoto
+  /** Danh sách ảnh chụp thực tế của quy cách; DB chỉ lưu publicId/URL/metadata. */
+  photos?: PackagingPhoto[]
 }
 
 export interface CreateVersionInput {

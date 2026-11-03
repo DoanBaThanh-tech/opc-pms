@@ -1,12 +1,12 @@
-import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowLeft, Download, Eye, FileText, FlaskConical, Layers, Pill, Plus } from 'lucide-react'
+import { ArrowLeft, Download, FileText, FlaskConical, Layers, Pill, Plus } from 'lucide-react'
 import { Button } from '@/core/components/Button'
 import { Select } from '@/core/components/Select'
 import type { Product, ProductStatus } from '@/features/products/logic/types'
 import { STATUS_META } from '@/features/products/logic/constants'
 import { lifecycleLabelOf } from '../logic/approvalUtils'
 import type { ProductVersion } from '../logic/types'
+import { compareVersion } from '../logic/versionUtils'
 
 interface Props {
   product: Product
@@ -32,13 +32,9 @@ const STATUS_DOT: Record<ProductStatus, string> = {
 }
 
 export function DetailHero({ product, version, versions, dosageName, categoryName, docsCount, downloading, creating, canCreate = true, onSelect, onCreate, onDownload }: Props) {
-  const [pendingId, setPendingId] = useState(String(version.id))
-
-  const apply = () => {
-    const id = Number(pendingId)
-    if (id && id !== version.id) onSelect(id)
-  }
-  const options = versions.map((v) => ({ value: v.id, label: `v${v.version} · ${lifecycleLabelOf(v)}` }))
+  const options = [...versions]
+    .sort((a, b) => compareVersion(a.version, b.version))
+    .map((v) => ({ value: v.id, label: `v${v.version} · ${lifecycleLabelOf(v)}` }))
   const statusMeta = STATUS_META[product.status]
 
   return (
@@ -95,19 +91,19 @@ export function DetailHero({ product, version, versions, dosageName, categoryNam
               <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-brand-100">Chuyển phiên bản</p>
               <span className="text-[10px] font-medium text-brand-100/80">{versions.length} phiên bản</span>
             </div>
-            <div className="mt-2 flex gap-2">
+            <div className="mt-2">
               <Select
                 aria-label="Chọn phiên bản để xem"
                 options={options}
-                value={pendingId}
-                onChange={(e) => setPendingId(e.target.value)}
+                value={String(version.id)}
+                onChange={(e) => {
+                  const id = Number(e.target.value)
+                  if (id && id !== version.id) onSelect(id)
+                }}
                 className="!h-10 text-xs"
               />
-              <Button size="sm" variant="light" icon={<Eye className="size-4" />} onClick={apply} disabled={pendingId === String(version.id)} className="!h-10 shrink-0">
-                Xem
-              </Button>
             </div>
-            <p className="mt-2 text-[10px] leading-relaxed text-brand-100/75">Phiên bản cũ chỉ được xem và tải hồ sơ, không thể áp dụng lại.</p>
+            <p className="mt-2 text-[10px] leading-relaxed text-brand-100/75">Chọn phiên bản trong danh sách để xem ngay hồ sơ tương ứng. Phiên bản cũ chỉ được xem và tải hồ sơ, không thể áp dụng lại.</p>
           </div>
         </div>
       </div>
